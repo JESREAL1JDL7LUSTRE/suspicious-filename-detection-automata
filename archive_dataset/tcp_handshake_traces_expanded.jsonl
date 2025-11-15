@@ -1,0 +1,74 @@
+{"trace_id": "T001", "sequence": ["SYN", "SYN-ACK", "ACK"], "valid": true, "description": "Valid 3-way handshake (variant 1)", "category": "Normal"}
+{"trace_id": "T002", "sequence": ["SYN", "SYN-ACK", "ACK"], "valid": true, "description": "Valid 3-way handshake (variant 2)", "category": "Normal"}
+{"trace_id": "T003", "sequence": ["SYN", "SYN-ACK", "ACK"], "valid": true, "description": "Valid 3-way handshake (variant 3)", "category": "Normal"}
+{"trace_id": "T004", "sequence": ["SYN", "SYN-ACK", "ACK", "DATA", "ACK"], "valid": true, "description": "Valid handshake with data transfer (variant 1)", "category": "Normal"}
+{"trace_id": "T005", "sequence": ["SYN", "SYN-ACK", "ACK", "DATA", "ACK"], "valid": true, "description": "Valid handshake with data transfer (variant 2)", "category": "Normal"}
+{"trace_id": "T006", "sequence": ["SYN", "SYN-ACK", "ACK", "DATA", "ACK"], "valid": true, "description": "Valid handshake with data transfer (variant 3)", "category": "Normal"}
+{"trace_id": "T007", "sequence": ["SYN", "SYN-ACK", "ACK", "SYN", "SYN-ACK", "ACK"], "valid": true, "description": "Two consecutive valid handshakes", "category": "Normal"}
+{"trace_id": "T008", "sequence": ["SYN", "SYN-ACK", "ACK", "SYN", "SYN-ACK", "ACK", "SYN", "SYN-ACK", "ACK"], "valid": true, "description": "Three consecutive valid handshakes", "category": "Normal"}
+{"trace_id": "T009", "sequence": ["SYN", "SYN-ACK", "ACK", "DATA", "ACK", "FIN", "ACK"], "valid": true, "description": "Complete connection lifecycle (variant 1)", "category": "Normal"}
+{"trace_id": "T010", "sequence": ["SYN", "SYN-ACK", "ACK", "DATA", "ACK", "FIN", "ACK"], "valid": true, "description": "Complete connection lifecycle (variant 2)", "category": "Normal"}
+{"trace_id": "T011", "sequence": ["SYN", "SYN-ACK", "ACK", "DATA", "ACK", "FIN", "ACK"], "valid": true, "description": "Complete connection lifecycle (variant 3)", "category": "Normal"}
+{"trace_id": "T012", "sequence": ["SYN", "SYN-ACK", "ACK", "FIN", "ACK"], "valid": true, "description": "Valid handshake with immediate close", "category": "Normal"}
+{"trace_id": "T013", "sequence": ["SYN", "SYN-ACK", "ACK", "DATA", "DATA", "ACK", "FIN", "ACK"], "valid": true, "description": "Valid handshake with multiple data packets", "category": "Normal"}
+{"trace_id": "T014", "sequence": ["SYN", "SYN-ACK", "ACK", "DATA", "ACK", "DATA", "ACK"], "valid": true, "description": "Valid handshake with bidirectional data", "category": "Normal"}
+{"trace_id": "T015", "sequence": ["SYN"], "valid": false, "description": "Incomplete - only SYN sent (variant 1)", "category": "Incomplete Handshake"}
+{"trace_id": "T016", "sequence": ["SYN"], "valid": false, "description": "Incomplete - only SYN sent (variant 2)", "category": "Incomplete Handshake"}
+{"trace_id": "T017", "sequence": ["SYN"], "valid": false, "description": "Incomplete - only SYN sent (variant 3)", "category": "Incomplete Handshake"}
+{"trace_id": "T018", "sequence": ["SYN"], "valid": false, "description": "Incomplete - only SYN sent (variant 4)", "category": "Incomplete Handshake"}
+{"trace_id": "T019", "sequence": ["SYN"], "valid": false, "description": "Incomplete - only SYN sent (variant 5)", "category": "Incomplete Handshake"}
+{"trace_id": "T020", "sequence": ["SYN", "SYN-ACK"], "valid": false, "description": "Incomplete - missing final ACK (variant 1)", "category": "Incomplete Handshake"}
+{"trace_id": "T021", "sequence": ["SYN", "SYN-ACK"], "valid": false, "description": "Incomplete - missing final ACK (variant 2)", "category": "Incomplete Handshake"}
+{"trace_id": "T022", "sequence": ["SYN", "SYN-ACK"], "valid": false, "description": "Incomplete - missing final ACK (variant 3)", "category": "Incomplete Handshake"}
+{"trace_id": "T023", "sequence": ["SYN", "SYN-ACK"], "valid": false, "description": "Incomplete - missing final ACK (variant 4)", "category": "Incomplete Handshake"}
+{"trace_id": "T024", "sequence": ["SYN", "SYN-ACK"], "valid": false, "description": "Incomplete - missing final ACK (variant 5)", "category": "Incomplete Handshake"}
+{"trace_id": "T025", "sequence": ["SYN", "ACK"], "valid": false, "description": "Missing SYN-ACK in middle (variant 1)", "category": "Malformed Handshake"}
+{"trace_id": "T026", "sequence": ["SYN", "ACK"], "valid": false, "description": "Missing SYN-ACK in middle (variant 2)", "category": "Malformed Handshake"}
+{"trace_id": "T027", "sequence": ["SYN", "ACK"], "valid": false, "description": "Missing SYN-ACK in middle (variant 3)", "category": "Malformed Handshake"}
+{"trace_id": "T028", "sequence": ["SYN", "ACK"], "valid": false, "description": "Missing SYN-ACK in middle (variant 4)", "category": "Malformed Handshake"}
+{"trace_id": "T029", "sequence": ["SYN", "ACK"], "valid": false, "description": "Missing SYN-ACK in middle (variant 5)", "category": "Malformed Handshake"}
+{"trace_id": "T030", "sequence": ["SYN-ACK", "ACK"], "valid": false, "description": "Missing initial SYN (variant 1)", "category": "Malformed Handshake"}
+{"trace_id": "T031", "sequence": ["SYN-ACK", "ACK"], "valid": false, "description": "Missing initial SYN (variant 2)", "category": "Malformed Handshake"}
+{"trace_id": "T032", "sequence": ["SYN-ACK", "ACK"], "valid": false, "description": "Missing initial SYN (variant 3)", "category": "Malformed Handshake"}
+{"trace_id": "T033", "sequence": ["SYN-ACK", "ACK"], "valid": false, "description": "Missing initial SYN (variant 4)", "category": "Malformed Handshake"}
+{"trace_id": "T034", "sequence": ["SYN-ACK", "ACK"], "valid": false, "description": "Missing initial SYN (variant 5)", "category": "Malformed Handshake"}
+{"trace_id": "T035", "sequence": ["ACK"], "valid": false, "description": "ACK without handshake (variant 1)", "category": "Malformed Handshake"}
+{"trace_id": "T036", "sequence": ["ACK"], "valid": false, "description": "ACK without handshake (variant 2)", "category": "Malformed Handshake"}
+{"trace_id": "T037", "sequence": ["ACK"], "valid": false, "description": "ACK without handshake (variant 3)", "category": "Malformed Handshake"}
+{"trace_id": "T038", "sequence": ["ACK"], "valid": false, "description": "ACK without handshake (variant 4)", "category": "Malformed Handshake"}
+{"trace_id": "T039", "sequence": ["ACK"], "valid": false, "description": "ACK without handshake (variant 5)", "category": "Malformed Handshake"}
+{"trace_id": "T040", "sequence": ["ACK", "SYN", "SYN-ACK"], "valid": false, "description": "Completely reversed order (variant 1)", "category": "Wrong Order"}
+{"trace_id": "T041", "sequence": ["ACK", "SYN", "SYN-ACK"], "valid": false, "description": "Completely reversed order (variant 2)", "category": "Wrong Order"}
+{"trace_id": "T042", "sequence": ["ACK", "SYN", "SYN-ACK"], "valid": false, "description": "Completely reversed order (variant 3)", "category": "Wrong Order"}
+{"trace_id": "T043", "sequence": ["SYN", "ACK", "SYN-ACK"], "valid": false, "description": "ACK before SYN-ACK (variant 1)", "category": "Wrong Order"}
+{"trace_id": "T044", "sequence": ["SYN", "ACK", "SYN-ACK"], "valid": false, "description": "ACK before SYN-ACK (variant 2)", "category": "Wrong Order"}
+{"trace_id": "T045", "sequence": ["SYN", "ACK", "SYN-ACK"], "valid": false, "description": "ACK before SYN-ACK (variant 3)", "category": "Wrong Order"}
+{"trace_id": "T046", "sequence": ["SYN-ACK", "SYN", "ACK"], "valid": false, "description": "SYN-ACK before SYN (variant 1)", "category": "Wrong Order"}
+{"trace_id": "T047", "sequence": ["SYN-ACK", "SYN", "ACK"], "valid": false, "description": "SYN-ACK before SYN (variant 2)", "category": "Wrong Order"}
+{"trace_id": "T048", "sequence": ["SYN-ACK", "SYN", "ACK"], "valid": false, "description": "SYN-ACK before SYN (variant 3)", "category": "Wrong Order"}
+{"trace_id": "T049", "sequence": ["SYN-ACK", "SYN", "ACK"], "valid": false, "description": "SYN-ACK before SYN (variant 4)", "category": "Wrong Order"}
+{"trace_id": "T050", "sequence": ["SYN", "SYN", "ACK"], "valid": false, "description": "Duplicate SYN (variant 1)", "category": "Duplicate Packets"}
+{"trace_id": "T051", "sequence": ["SYN", "SYN", "ACK"], "valid": false, "description": "Duplicate SYN (variant 2)", "category": "Duplicate Packets"}
+{"trace_id": "T052", "sequence": ["SYN", "SYN", "ACK"], "valid": false, "description": "Duplicate SYN (variant 3)", "category": "Duplicate Packets"}
+{"trace_id": "T053", "sequence": ["SYN", "SYN-ACK", "SYN-ACK", "ACK"], "valid": false, "description": "Duplicate SYN-ACK (variant 1)", "category": "Duplicate Packets"}
+{"trace_id": "T054", "sequence": ["SYN", "SYN-ACK", "SYN-ACK", "ACK"], "valid": false, "description": "Duplicate SYN-ACK (variant 2)", "category": "Duplicate Packets"}
+{"trace_id": "T055", "sequence": ["SYN", "SYN-ACK", "SYN-ACK", "ACK"], "valid": false, "description": "Duplicate SYN-ACK (variant 3)", "category": "Duplicate Packets"}
+{"trace_id": "T056", "sequence": ["SYN", "SYN-ACK", "ACK", "ACK"], "valid": false, "description": "Duplicate ACK after handshake (variant 1)", "category": "Duplicate Packets"}
+{"trace_id": "T057", "sequence": ["SYN", "SYN-ACK", "ACK", "ACK"], "valid": false, "description": "Duplicate ACK after handshake (variant 2)", "category": "Duplicate Packets"}
+{"trace_id": "T058", "sequence": ["SYN", "SYN-ACK", "ACK", "ACK"], "valid": false, "description": "Duplicate ACK after handshake (variant 3)", "category": "Duplicate Packets"}
+{"trace_id": "T059", "sequence": ["SYN", "SYN-ACK", "ACK", "ACK"], "valid": false, "description": "Duplicate ACK after handshake (variant 4)", "category": "Duplicate Packets"}
+{"trace_id": "T060", "sequence": ["SYN", "SYN", "SYN"], "valid": false, "description": "SYN flood pattern - 3 SYNs (attack 1)", "category": "Attack Pattern"}
+{"trace_id": "T061", "sequence": ["SYN", "SYN", "SYN"], "valid": false, "description": "SYN flood pattern - 3 SYNs (attack 2)", "category": "Attack Pattern"}
+{"trace_id": "T062", "sequence": ["SYN", "SYN", "SYN"], "valid": false, "description": "SYN flood pattern - 3 SYNs (attack 3)", "category": "Attack Pattern"}
+{"trace_id": "T063", "sequence": ["SYN", "SYN", "SYN", "SYN"], "valid": false, "description": "SYN flood pattern - 4 SYNs (attack 1)", "category": "Attack Pattern"}
+{"trace_id": "T064", "sequence": ["SYN", "SYN", "SYN", "SYN"], "valid": false, "description": "SYN flood pattern - 4 SYNs (attack 2)", "category": "Attack Pattern"}
+{"trace_id": "T065", "sequence": ["SYN", "SYN", "SYN", "SYN", "SYN"], "valid": false, "description": "Heavy SYN flood - 5 SYNs", "category": "Attack Pattern"}
+{"trace_id": "T066", "sequence": ["SYN", "RST"], "valid": false, "description": "Handshake interrupted by reset (variant 1)", "category": "Attack Pattern"}
+{"trace_id": "T067", "sequence": ["SYN", "RST"], "valid": false, "description": "Handshake interrupted by reset (variant 2)", "category": "Attack Pattern"}
+{"trace_id": "T068", "sequence": ["RST"], "valid": false, "description": "Reset without handshake (variant 1)", "category": "Attack Pattern"}
+{"trace_id": "T069", "sequence": ["RST"], "valid": false, "description": "Reset without handshake (variant 2)", "category": "Attack Pattern"}
+{"trace_id": "T070", "sequence": [], "valid": false, "description": "Empty sequence", "category": "Empty"}
+{"trace_id": "T071", "sequence": ["SYN", "FIN"], "valid": false, "description": "FIN during handshake", "category": "Unexpected Packet"}
+{"trace_id": "T072", "sequence": ["DATA"], "valid": false, "description": "Data without handshake", "category": "Unexpected Packet"}
+{"trace_id": "T073", "sequence": ["SYN", "SYN-ACK", "ACK", "SYN"], "valid": false, "description": "New SYN after complete handshake", "category": "Unexpected Packet"}
+{"trace_id": "T074", "sequence": ["SYN", "SYN", "SYN-ACK", "ACK"], "valid": false, "description": "SYN retransmission before response", "category": "Retransmission"}

@@ -1,0 +1,2060 @@
+{
+  "project_overview": {
+    "title": "CS311 Suspicious Filename Detection & TCP Protocol Validation Simulator",
+    "purpose": "Demonstrate Chomsky Hierarchy by implementing DFA (Regular Languages) for pattern matching and PDA (Context-Free Languages) for protocol validation",
+    "programming_language": "C++",
+    "datasets": {
+      "dfa_dataset": "Malicious_file_trick_detection.jsonl (341 entries)",
+      "pda_dataset": "tcp_handshake_traces_expanded.jsonl (75 entries)"
+    },
+    "key_algorithms": [
+      "Regex to NFA conversion (Thompson's Construction)",
+      "NFA to DFA conversion (Subset Construction)",
+      "DFA Minimization (Hopcroft's Algorithm)",
+      "IGA (Improved Grouping Algorithm) for state reduction",
+      "PDA with stack for TCP validation"
+    ]
+  },
+  
+  "project_structure": {
+    "directory_layout": {
+      "root": "D:/SCHOOL/Automata/finalProject/",
+      "subdirectories": [
+        {
+          "path": "archive/",
+          "contents": [
+            "Malicious_file_trick_detection.jsonl",
+            "tcp_handshake_traces_expanded.jsonl"
+          ]
+        },
+        {
+          "path": "src/",
+          "contents": [
+            "main.cpp",
+            "DFAModule.h",
+            "DFAModule.cpp",
+            "PDAModule.h",
+            "PDAModule.cpp",
+            "RegexParser.h",
+            "RegexParser.cpp",
+            "NFAToDFA.h",
+            "NFAToDFA.cpp",
+            "DFAMinimizer.h",
+            "DFAMinimizer.cpp",
+            "IGA.h",
+            "IGA.cpp",
+            "JSONParser.h",
+            "JSONParser.cpp",
+            "Utils.h",
+            "Utils.cpp"
+          ]
+        },
+        {
+          "path": "include/",
+          "contents": [
+            "json.hpp (nlohmann/json library)"
+          ]
+        },
+        {
+          "path": "output/",
+          "contents": [
+            "results.txt",
+            "performance_metrics.txt"
+          ]
+        }
+      ]
+    }
+  },
+  
+  "implementation_steps": {
+    "phase_1_setup": {
+      "step_number": 1,
+      "title": "Project Setup & Dependencies",
+      "estimated_time": "30 minutes",
+      "tasks": [
+        {
+          "task_id": "1.1",
+          "description": "Create project directory structure",
+          "commands": [
+            "mkdir -p src include output archive",
+            "cd D:/SCHOOL/Automata/finalProject/"
+          ]
+        },
+        {
+          "task_id": "1.2",
+          "description": "Install JSON parsing library",
+          "library": "nlohmann/json",
+          "installation": [
+            "Download json.hpp from https://github.com/nlohmann/json/releases",
+            "Place in include/ directory",
+            "Or use: #include <nlohmann/json.hpp> if using package manager"
+          ]
+        },
+        {
+          "task_id": "1.3",
+          "description": "Verify datasets are in place",
+          "files_to_check": [
+            "archive/Malicious_file_trick_detection.jsonl (341 entries)",
+            "archive/tcp_handshake_traces_expanded.jsonl (75 entries)"
+          ]
+        },
+        {
+          "task_id": "1.4",
+          "description": "Create CMakeLists.txt or Makefile",
+          "compiler_flags": [
+            "-std=c++17",
+            "-Wall",
+            "-Wextra",
+            "-O2"
+          ]
+        }
+      ]
+    },
+    
+    "phase_2_data_structures": {
+      "step_number": 2,
+      "title": "Define Core Data Structures",
+      "estimated_time": "1 hour",
+      "tasks": [
+        {
+          "task_id": "2.1",
+          "file": "src/Utils.h",
+          "description": "Define fundamental automata structures",
+          "structures": [
+            {
+              "name": "State",
+              "purpose": "Represent a state in NFA/DFA",
+              "members": [
+                "int id",
+                "bool is_accepting",
+                "std::string label"
+              ]
+            },
+            {
+              "name": "Transition",
+              "purpose": "Represent state transitions",
+              "members": [
+                "int from_state",
+                "int to_state",
+                "char symbol",
+                "bool is_epsilon (for NFA only)"
+              ]
+            },
+            {
+              "name": "NFA",
+              "purpose": "Nondeterministic Finite Automaton",
+              "members": [
+                "std::vector<State> states",
+                "std::vector<Transition> transitions",
+                "int start_state",
+                "std::set<int> accepting_states",
+                "std::set<char> alphabet"
+              ]
+            },
+            {
+              "name": "DFA",
+              "purpose": "Deterministic Finite Automaton",
+              "members": [
+                "std::vector<State> states",
+                "std::map<std::pair<int,char>, int> transition_table",
+                "int start_state",
+                "std::set<int> accepting_states",
+                "std::set<char> alphabet"
+              ]
+            },
+            {
+              "name": "PDA",
+              "purpose": "Pushdown Automaton",
+              "members": [
+                "std::vector<State> states",
+                "std::stack<std::string> pda_stack",
+                "int current_state",
+                "std::set<int> accepting_states"
+              ]
+            },
+            {
+              "name": "FilenameEntry",
+              "purpose": "Store filename dataset entry",
+              "members": [
+                "std::string filename",
+                "std::string technique",
+                "std::string category",
+                "std::string detected_by"
+              ]
+            },
+            {
+              "name": "TCPTrace",
+              "purpose": "Store TCP handshake trace",
+              "members": [
+                "std::string trace_id",
+                "std::vector<std::string> sequence",
+                "bool valid",
+                "std::string description",
+                "std::string category"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    
+    "phase_3_json_parser": {
+      "step_number": 3,
+      "title": "Implement JSON Dataset Parser",
+      "estimated_time": "45 minutes",
+      "tasks": [
+        {
+          "task_id": "3.1",
+          "file": "src/JSONParser.h",
+          "description": "Create JSON parser class",
+          "class_definition": {
+            "name": "JSONParser",
+            "methods": [
+              {
+                "signature": "std::vector<FilenameEntry> loadFilenameDataset(const std::string& filepath)",
+                "purpose": "Load malicious filename JSONL file",
+                "returns": "Vector of FilenameEntry objects"
+              },
+              {
+                "signature": "std::vector<TCPTrace> loadTCPDataset(const std::string& filepath)",
+                "purpose": "Load TCP handshake traces JSONL file",
+                "returns": "Vector of TCPTrace objects"
+              }
+            ]
+          }
+        },
+        {
+          "task_id": "3.2",
+          "file": "src/JSONParser.cpp",
+          "description": "Implement JSON parsing logic",
+          "implementation_details": {
+            "loadFilenameDataset": {
+              "steps": [
+                "Open JSONL file using std::ifstream",
+                "Read line by line",
+                "Parse each line as JSON using nlohmann::json",
+                "Extract: filename, technique, category, detected_by",
+                "Create FilenameEntry object",
+                "Add to vector",
+                "Handle parsing errors with try-catch",
+                "Return vector of entries"
+              ],
+              "error_handling": [
+                "File not found",
+                "Invalid JSON format",
+                "Missing required fields"
+              ]
+            },
+            "loadTCPDataset": {
+              "steps": [
+                "Open JSONL file using std::ifstream",
+                "Read line by line",
+                "Parse each line as JSON",
+                "Extract: trace_id, sequence (array), valid (bool), description, category",
+                "Create TCPTrace object",
+                "Add to vector",
+                "Handle parsing errors",
+                "Return vector of traces"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    
+    "phase_4_regex_to_nfa": {
+      "step_number": 4,
+      "title": "Implement Regex to NFA Conversion (Thompson's Construction)",
+      "estimated_time": "2 hours",
+      "tasks": [
+        {
+          "task_id": "4.1",
+          "file": "src/RegexParser.h",
+          "description": "Create regex parser class",
+          "class_definition": {
+            "name": "RegexParser",
+            "methods": [
+              {
+                "signature": "NFA regexToNFA(const std::string& regex)",
+                "purpose": "Convert regex pattern to NFA using Thompson's Construction",
+                "algorithm": "Thompson's Construction"
+              }
+            ]
+          }
+        },
+        {
+          "task_id": "4.2",
+          "file": "src/RegexParser.cpp",
+          "description": "Implement Thompson's Construction algorithm",
+          "regex_patterns_to_support": [
+            {
+              "pattern": ".*\\.(pdf|doc|txt)\\.(exe|scr|bat)$",
+              "description": "Double extension detection",
+              "technique": "Alternation (|), Concatenation, Kleene star (*)"
+            },
+            {
+              "pattern": ".*[\\u202E\\u202D].*\\.(exe|bat)$",
+              "description": "Unicode right-to-left override",
+              "technique": "Character class, Unicode support"
+            },
+            {
+              "pattern": ".*\\s+\\.(exe|scr|bat)$",
+              "description": "Whitespace padding",
+              "technique": "Whitespace character class (\\s+)"
+            }
+          ],
+          "implementation_steps": [
+            {
+              "step": "1. Parse regex into postfix notation (Shunting Yard algorithm)",
+              "details": [
+                "Handle operators: concatenation (implicit), alternation (|), Kleene star (*), plus (+), optional (?)",
+                "Handle parentheses for grouping",
+                "Output: postfix expression"
+              ]
+            },
+            {
+              "step": "2. Build NFA fragments for each operator",
+              "fragments": [
+                {
+                  "operator": "Single character 'a'",
+                  "nfa": "Create 2 states: start -> 'a' -> accept"
+                },
+                {
+                  "operator": "Concatenation (AB)",
+                  "nfa": "Connect accepting state of A to start state of B"
+                },
+                {
+                  "operator": "Alternation (A|B)",
+                  "nfa": "Create new start with epsilon transitions to A and B starts, connect A and B accepts to new accept with epsilon"
+                },
+                {
+                  "operator": "Kleene star (A*)",
+                  "nfa": "Create new start and accept, epsilon from start to A-start and new accept, epsilon from A-accept back to A-start and to new accept"
+                }
+              ]
+            },
+            {
+              "step": "3. Process postfix expression with NFA fragment stack",
+              "details": [
+                "For operand: push single-char NFA fragment",
+                "For operator: pop operands, apply construction, push result",
+                "Final stack top is complete NFA"
+              ]
+            }
+          ],
+          "key_regex_patterns": [
+            "double_extension: .*\\\\.(pdf|doc|docx|txt)\\\\.(exe|scr|bat|com)$",
+            "unicode_trick: .*[\\\\u202E\\\\u202D].*\\\\.(exe|scr|bat)$",
+            "whitespace_padding: .*\\\\s+\\\\.(exe|scr|bat|com)$",
+            "mimic_legitimate: .*(update|patch|installer|setup)\\\\.(iso|img|msi)$",
+            "hidden_extension: .*\\\\.\\\\s{2,}\\\\.(exe|scr)$"
+          ]
+        }
+      ]
+    },
+    
+    "phase_5_nfa_to_dfa": {
+      "step_number": 5,
+      "title": "Implement NFA to DFA Conversion (Subset Construction)",
+      "estimated_time": "2 hours",
+      "tasks": [
+        {
+          "task_id": "5.1",
+          "file": "src/NFAToDFA.h",
+          "description": "Create NFA to DFA converter class",
+          "class_definition": {
+            "name": "NFAToDFA",
+            "methods": [
+              {
+                "signature": "DFA convertToDFA(const NFA& nfa)",
+                "purpose": "Convert NFA to equivalent DFA using Subset Construction",
+                "algorithm": "Subset Construction (Powerset Construction)"
+              },
+              {
+                "signature": "std::set<int> epsilonClosure(const NFA& nfa, std::set<int> states)",
+                "purpose": "Compute epsilon closure of a set of NFA states"
+              },
+              {
+                "signature": "std::set<int> move(const NFA& nfa, std::set<int> states, char symbol)",
+                "purpose": "Compute states reachable from set of states on symbol"
+              }
+            ]
+          }
+        },
+        {
+          "task_id": "5.2",
+          "file": "src/NFAToDFA.cpp",
+          "description": "Implement Subset Construction algorithm",
+          "algorithm_steps": [
+            {
+              "step": "1. Compute epsilon closure of NFA start state",
+              "code_logic": "Start with NFA start state, recursively follow all epsilon transitions, this becomes DFA start state"
+            },
+            {
+              "step": "2. Initialize DFA with start state",
+              "code_logic": "DFA start state = epsilon-closure({NFA_start}), mark as unmarked state"
+            },
+            {
+              "step": "3. While there are unmarked DFA states",
+              "code_logic": "Pop unmarked state T from worklist"
+            },
+            {
+              "step": "4. For each symbol in alphabet",
+              "code_logic": [
+                "Compute U = epsilon-closure(move(T, symbol))",
+                "If U not in DFA states, add U as new unmarked state",
+                "Add transition: T --symbol--> U in DFA transition table"
+              ]
+            },
+            {
+              "step": "5. Mark accepting states",
+              "code_logic": "DFA state is accepting if it contains any NFA accepting state"
+            }
+          ],
+          "helper_functions": {
+            "epsilonClosure": {
+              "purpose": "Find all states reachable via epsilon transitions",
+              "implementation": [
+                "Use BFS/DFS starting from input states",
+                "Follow only epsilon transitions",
+                "Return set of all reachable states"
+              ]
+            },
+            "move": {
+              "purpose": "Find states reachable on specific symbol",
+              "implementation": [
+                "For each state in input set",
+                "Find transitions on given symbol",
+                "Collect destination states",
+                "Return set of destinations"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    
+    "phase_6_dfa_minimization": {
+      "step_number": 6,
+      "title": "Implement DFA Minimization (Hopcroft's Algorithm)",
+      "estimated_time": "1.5 hours",
+      "tasks": [
+        {
+          "task_id": "6.1",
+          "file": "src/DFAMinimizer.h",
+          "description": "Create DFA minimizer class",
+          "class_definition": {
+            "name": "DFAMinimizer",
+            "methods": [
+              {
+                "signature": "DFA minimize(const DFA& dfa)",
+                "purpose": "Minimize DFA using Hopcroft's Algorithm",
+                "algorithm": "Hopcroft's Algorithm (Partition Refinement)"
+              }
+            ]
+          }
+        },
+        {
+          "task_id": "6.2",
+          "file": "src/DFAMinimizer.cpp",
+          "description": "Implement Hopcroft's Algorithm",
+          "algorithm_steps": [
+            {
+              "step": "1. Initial partition",
+              "code_logic": "Partition states into 2 sets: accepting states and non-accepting states"
+            },
+            {
+              "step": "2. Refine partitions",
+              "code_logic": [
+                "For each partition P in current partitioning",
+                "For each symbol a in alphabet",
+                "Check if states in P transition to different partitions on symbol a",
+                "If yes, split P into smaller partitions",
+                "Repeat until no more splits possible (fixed point)"
+              ]
+            },
+            {
+              "step": "3. Build minimized DFA",
+              "code_logic": [
+                "Each final partition becomes a state in minimized DFA",
+                "Transitions: if any state in partition P1 goes to state in partition P2 on symbol a, add transition P1 --a--> P2",
+                "Start state: partition containing original start state",
+                "Accepting states: partitions containing original accepting states"
+              ]
+            }
+          ],
+          "optimization_note": "Hopcroft's algorithm runs in O(n log n) time where n is number of states"
+        }
+      ]
+    },
+    
+    "phase_7_iga_implementation": {
+      "step_number": 7,
+      "title": "Implement IGA (Improved Grouping Algorithm)",
+      "estimated_time": "2 hours",
+      "tasks": [
+        {
+          "task_id": "7.1",
+          "file": "src/IGA.h",
+          "description": "Create IGA class for grouping similar patterns",
+          "class_definition": {
+            "name": "IGA",
+            "methods": [
+              {
+                "signature": "std::vector<std::vector<DFA>> groupDFAs(const std::vector<DFA>& dfas)",
+                "purpose": "Group similar DFAs to reduce total states",
+                "algorithm": "Improved Grouping Algorithm (Wang, 2016)"
+              },
+              {
+                "signature": "double calculateExpansionCoefficient(const DFA& dfa1, const DFA& dfa2)",
+                "purpose": "Calculate interaction between two DFAs",
+                "returns": "Expansion coefficient (lower = more compatible)"
+              },
+              {
+                "signature": "DFA mergeDFAs(const std::vector<DFA>& group)",
+                "purpose": "Merge a group of DFAs into single optimized DFA"
+              }
+            ]
+          }
+        },
+        {
+          "task_id": "7.2",
+          "file": "src/IGA.cpp",
+          "description": "Implement IGA algorithm",
+          "algorithm_details": {
+            "expansion_coefficient": {
+              "purpose": "Measure how much states increase when merging two DFAs",
+              "formula": "EC(A,B) = (States(A∪B) - States(A) - States(B)) / (States(A) + States(B))",
+              "interpretation": [
+                "EC close to 0: DFAs share many transitions, good for grouping",
+                "EC high: DFAs interact poorly, should be in separate groups"
+              ]
+            },
+            "grouping_algorithm": {
+              "steps": [
+                {
+                  "step": "1. Initialize",
+                  "code": "Create one group per DFA initially"
+                },
+                {
+                  "step": "2. Calculate pairwise expansion coefficients",
+                  "code": "For all pairs of groups, compute EC"
+                },
+                {
+                  "step": "3. Merge best pair",
+                  "code": [
+                    "Find pair with lowest EC",
+                    "Merge into single group",
+                    "Update EC values involving merged group"
+                  ]
+                },
+                {
+                  "step": "4. Repeat",
+                  "code": "Continue merging until EC threshold exceeded or max group size reached"
+                },
+                {
+                  "step": "5. Output",
+                  "code": "Return optimized grouping of DFAs"
+                }
+              ]
+            },
+            "merge_process": {
+              "description": "Combine multiple DFAs into single DFA",
+              "method": "Product construction with shared transitions",
+              "steps": [
+                "Compute union of alphabets",
+                "Build product states (cross product of state sets)",
+                "Share common transitions when possible",
+                "Minimize resulting DFA"
+              ]
+            }
+          },
+          "expected_performance": {
+            "state_reduction": "~27% fewer states compared to ungrouped DFAs",
+            "reference": "Wang (2016)",
+            "measurement": "Compare total states before and after IGA"
+          }
+        }
+      ]
+    },
+    
+    "phase_8_dfa_module": {
+      "step_number": 8,
+      "title": "Implement DFA Module (Filename Pattern Detection)",
+      "estimated_time": "2 hours",
+      "tasks": [
+        {
+          "task_id": "8.1",
+          "file": "src/DFAModule.h",
+          "description": "Create DFA module class",
+          "class_definition": {
+            "name": "DFAModule",
+            "members": [
+              "std::vector<FilenameEntry> dataset",
+              "std::vector<std::string> regex_patterns",
+              "std::vector<NFA> nfas",
+              "std::vector<DFA> dfas",
+              "std::vector<DFA> minimized_dfas",
+              "std::vector<std::vector<DFA>> grouped_dfas",
+              "PerformanceMetrics metrics"
+            ],
+            "methods": [
+              {
+                "signature": "void loadDataset(const std::string& filepath)",
+                "purpose": "Load malicious filename dataset"
+              },
+              {
+                "signature": "void definePatterns()",
+                "purpose": "Define regex patterns for different techniques"
+              },
+              {
+                "signature": "void buildNFAs()",
+                "purpose": "Convert each regex to NFA"
+              },
+              {
+                "signature": "void convertToDFAs()",
+                "purpose": "Convert NFAs to DFAs"
+              },
+              {
+                "signature": "void minimizeDFAs()",
+                "purpose": "Minimize each DFA"
+              },
+              {
+                "signature": "void applyIGA()",
+                "purpose": "Group DFAs using IGA"
+              },
+              {
+                "signature": "void testPatterns()",
+                "purpose": "Test all filenames against DFAs"
+              },
+              {
+                "signature": "void generateReport()",
+                "purpose": "Output detection results and performance metrics"
+              }
+            ]
+          }
+        },
+        {
+          "task_id": "8.2",
+          "file": "src/DFAModule.cpp",
+          "description": "Implement DFA module logic",
+          "pattern_definitions": {
+            "patterns": [
+              {
+                "name": "double_extension",
+                "regex": ".*\\\\.(pdf|doc|docx|txt|xlsx|xls|jpg|jpeg|png)\\\\.(exe|scr|bat|com|vbs|js|pif)$",
+                "description": "Detects files with double extensions"
+              },
+              {
+                "name": "unicode_rtlo",
+                "regex": ".*[\\\\u202E\\\\u202D].*",
+                "description": "Detects right-to-left override Unicode trick"
+              },
+              {
+                "name": "unicode_homoglyph",
+                "regex": ".*[\\\\uFF21-\\\\uFF5A]+$",
+                "description": "Detects fullwidth Unicode characters"
+              },
+              {
+                "name": "whitespace_padding",
+                "regex": ".*\\\\s{2,}\\\\.(exe|scr|bat|com)$",
+                "description": "Detects hidden extensions with whitespace"
+              },
+              {
+                "name": "mimic_legitimate",
+                "regex": ".*(update|patch|installer|setup|system)\\\\.(iso|img|msi|dll)$",
+                "description": "Detects files mimicking system files"
+              }
+            ]
+          },
+          "testing_logic": {
+            "for_each_filename": [
+              "Test against each grouped DFA",
+              "Record which patterns matched",
+              "Track true positives, false positives, false negatives",
+              "Measure matching time per file"
+            ]
+          },
+          "performance_metrics": {
+            "metrics_to_collect": [
+              "Total DFA states before IGA",
+              "Total DFA states after IGA",
+              "State reduction percentage",
+              "Memory usage (estimated)",
+              "Average matching time per filename",
+              "Detection accuracy (TP, TN, FP, FN)",
+              "Number of patterns",
+              "Number of groups after IGA"
+            ]
+          }
+        }
+      ]
+    },
+    
+    "phase_9_pda_module": {
+      "step_number": 9,
+      "title": "Implement PDA Module (TCP Protocol Validation)",
+      "estimated_time": "2 hours",
+      "tasks": [
+        {
+          "task_id": "9.1",
+          "file": "src/PDAModule.h",
+          "description": "Create PDA module class",
+          "class_definition": {
+            "name": "PDAModule",
+            "members": [
+              "std::vector<TCPTrace> dataset",
+              "PDA pda",
+              "ValidationResults results"
+            ],
+            "methods": [
+              {
+                "signature": "void loadDataset(const std::string& filepath)",
+                "purpose": "Load TCP handshake traces"
+              },
+              {
+                "signature": "void buildPDA()",
+                "purpose": "Design PDA for TCP 3-way handshake validation"
+              },
+              {
+                "signature": "bool validateSequence(const std::vector<std::string>& sequence)",
+                "purpose": "Validate a TCP packet sequence using PDA"
+              },
+              {
+                "signature": "void testAllTraces()",
+                "purpose": "Validate all TCP traces in dataset"
+              },
+              {
+                "signature": "void showStackOperations(const std::vector<std::string>& sequence)",
+                "purpose": "Display step-by-step stack operations for a trace"
+              },
+              {
+                "signature": "void generateReport()",
+                "purpose": "Output validation results and statistics"
+              }
+            ]
+          }
+        },
+        {
+          "task_id": "9.2",
+          "file": "src/PDAModule.cpp",
+          "description": "Implement PDA validation logic",
+          "pda_design": {
+            "states": [
+              {
+                "state_id": 0,
+                "name": "q_start",
+                "description": "Initial state, waiting for SYN"
+              },
+              {
+                "state_id": 1,
+                "name": "q_syn_received",
+                "description": "SYN received, waiting for SYN-ACK"
+              },
+              {
+                "state_id": 2,
+                "name": "q_synack_received",
+                "description": "SYN-ACK received, waiting for ACK"
+              },
+              {
+                "state_id": 3,
+                "name": "q_accept",
+                "description": "Handshake complete, accepting state"
+              },
+              {
+                "state_id": -1,
+                "name": "q_error",
+                "description": "Error state for invalid sequences"
+              }
+            ],
+            "stack_alphabet": ["SYN", "SYN-ACK", "BOTTOM"],
+            "transitions": [
+              {
+                "from": "q_start",
+                "input": "SYN",
+                "stack_top": "BOTTOM",
+                "action": "Push SYN",
+                "to": "q_syn_received",
+                "description": "Receive initial SYN"
+              },
+              {
+                "from": "q_syn_received",
+                "input": "SYN-ACK",
+                "stack_top": "SYN",
+                "action": "Push SYN-ACK",
+                "to": "q_synack_received",
+                "description": "Receive SYN-ACK response"
+              },
+              {
+                "from": "q_synack_received",
+                "input": "ACK",
+                "stack_top": "SYN-ACK",
+                "action": "Pop all (clear stack)",
+                "to": "q_accept",
+                "description": "Complete handshake with final ACK"
+              },
+              {
+                "from": "q_accept",
+                "input": "DATA",
+                "stack_top": "BOTTOM",
+                "action": "No stack change",
+                "to": "q_accept",
+                "description": "Data transfer after handshake (optional)"
+              },
+              {
+                "from": "q_accept",
+                "input": "FIN",
+                "stack_top": "BOTTOM",
+                "action": "No stack change",
+                "to": "q_accept",
+                "description": "Connection close after handshake (optional)"
+              },
+              {
+                "from": "ANY",
+                "input": "RST",
+                "stack_top": "ANY",
+                "action": "Clear stack",
+                "to": "q_error",
+                "description": "Reset always causes error"
+              }
+            ]
+          },
+          "validation_algorithm": {
+            "steps": [
+              {
+                "step": "1. Initialize PDA",
+                "code": [
+                  "Set current_state = q_start",
+                  "Initialize stack with BOTTOM marker",
+                  "Clear any previous state"
+                ]
+              },
+              {
+                "step": "2. Process each packet in sequence",
+                "code": [
+                  "Read packet from input sequence",
+                  "Check current state and stack top",
+                  "Find matching transition rule",
+                  "If transition exists:",
+                  "  - Update current_state",
+                  "  - Perform stack operation (push/pop)",
+                  "  - Record operation for display",
+                  "If no transition:",
+                  "  - Move to q_error",
+                  "  - Mark sequence as INVALID",
+                  "  - Break"
+                ]
+              },
+              {
+                "step": "3. Check final state",
+                "code": [
+                  "If current_state == q_accept AND stack only has BOTTOM:",
+                  "  Return VALID (true)",
+                  "Else:",
+                  "  Return INVALID (false)"
+                ]
+              }
+            ]
+          },
+          "stack_operations_display": {
+            "format": "Show step-by-step for each trace",
+            "example_output": [
+              "Trace T001: [SYN, SYN-ACK, ACK]",
+              "Step 1: Read SYN | State: q_start -> q_syn_received | Stack: [BOTTOM] -> [BOTTOM, SYN]",
+              "Step 2: Read SYN-ACK | State: q_syn_received -> q_synack_received | Stack: [BOTTOM, SYN] -> [BOTTOM, SYN, SYN-ACK]",
+              "Step 3: Read ACK | State: q_synack_received -> q_accept | Stack: [BOTTOM, SYN, SYN-ACK] -> [BOTTOM]",
+              "Result: VALID (stack empty, in accepting state)"
+            ]
+          },
+          "validation_metrics": {
+            "metrics_to_collect": [
+              "Total traces tested",
+              "Valid traces correctly accepted",
+              "Invalid traces correctly rejected",
+              "False positives",
+              "False negatives",
+              "Validation accuracy percentage",
+              "Average stack depth",
+              "Maximum stack depth observed",
+              "Processing time per trace"
+            ]
+          }
+        }
+      ]
+    },
+    
+    "phase_10_main_program": {
+      "step_number": 10,
+      "title": "Implement Main Program Integration",
+      "estimated_time": "1 hour",
+      "tasks": [
+        {
+          "task_id": "10.1",
+          "file": "src/main.cpp",
+          "description": "Create main program that runs both modules",
+          "program_flow": [
+            {
+              "section": "1. Program Header",
+              "code": [
+                "#include <iostream>",
+                "#include <chrono>",
+                "#include \"DFAModule.h\"",
+                "#include \"PDAModule.h\"",
+                "",
+                "using namespace std;",
+                "using namespace std::chrono;"
+              ]
+            },
+            {
+              "section": "2. Display Banner",
+              "output": [
+                "=======================================================",
+                "CS311 Chomsky Hierarchy Security Simulator",
+                "Suspicious Filename Detection & TCP Protocol Validation",
+                "======================================================="
+              ]
+            },
+            {
+              "section": "3. MODULE 1 - DFA (Regular Languages)",
+              "steps": [
+                "Display module header",
+                "Create DFAModule instance",
+                "Load filename dataset (341 entries)",
+                "Define regex patterns (5-10 patterns)",
+                "Convert regex to NFA (Thompson's Construction)",
+                "Convert NFA to DFA (Subset Construction)",
+                "Minimize DFAs (Hopcroft's Algorithm)",
+                "Apply IGA grouping",
+                "Test all filenames",
+                "Display results and metrics",
+                "Measure execution time"
+              ]
+            },
+            {
+              "section": "4. MODULE 2 - PDA (Context-Free Languages)",
+              "steps": [
+                "Display module header",
+                "Create PDAModule instance",
+                "Load TCP trace dataset (75 entries)",
+                "Build PDA for TCP validation",
+                "Validate all traces",
+                "Show sample stack operations (3-5 examples)",
+                "Display results and metrics",
+                "Measure execution time"
+              ]
+            },
+            {
+              "section": "5. Comparative Analysis",
+              "output": [
+                "Display Chomsky Hierarchy demonstration",
+                "Compare DFA vs PDA capabilities",
+                "Show theoretical limitations",
+                "Summary of results"
+              ]
+            },
+            {
+              "section": "6. Save Results",
+              "actions": [
+                "Write detailed results to output/results.txt",
+                "Write performance metrics to output/performance_metrics.txt",
+                "Include timestamp",
+                "Include all statistics"
+              ]
+            }
+          ]
+        },
+        {
+          "task_id": "10.2",
+          "description": "Implement command-line arguments (optional)",
+          "arguments": [
+            {
+              "flag": "--dfa-only",
+              "description": "Run only DFA module"
+            },
+            {
+              "flag": "--pda-only",
+              "description": "Run only PDA module"
+            },
+            {
+              "flag": "--verbose",
+              "description": "Show detailed step-by-step operations"
+            },
+            {
+              "flag": "--output <file>",
+              "description": "Specify custom output file"
+            }
+          ]
+        }
+      ]
+    },
+    
+    "phase_11_output_formatting": {
+      "step_number": 11,
+      "title": "Design Output and Reporting",
+      "estimated_time": "1 hour",
+      "tasks": [
+        {
+          "task_id": "11.1",
+          "description": "Console output format",
+          "expected_output": {
+            "module_1_dfa": {
+              "header": [
+                "",
+                "╔════════════════════════════════════════════════════════╗",
+                "║  MODULE 1: Filename Pattern Detection (DFA)           ║",
+                "║  Regular Languages - Level 3 Chomsky Hierarchy        ║",
+                "╚════════════════════════════════════════════════════════╝",
+                ""
+              ],
+              "loading_phase": [
+                "[INFO] Loading dataset: Malicious_file_trick_detection.jsonl",
+                "[SUCCESS] Loaded 341 malicious filename entries",
+                ""
+              ],
+              "pattern_phase": [
+                "[INFO] Defining regex patterns...",
+                "  Pattern 1: Double extension (.*\\.(pdf|doc)\\.(exe|scr)$)",
+                "  Pattern 2: Unicode RTLO ([\\u202E\\u202D])",
+                "  Pattern 3: Whitespace padding (\\s+\\.(exe)$)",
+                "  Pattern 4: Mimic legitimate (.*(update|setup)\\.(iso|msi)$)",
+                "  Pattern 5: Unicode homoglyph ([\\uFF21-\\uFF5A]+$)",
+                "[SUCCESS] Defined 5 detection patterns",
+                ""
+              ],
+              "nfa_phase": [
+                "[INFO] Converting regex to NFA (Thompson's Construction)...",
+                "[SUCCESS] Built 5 NFAs",
+                "  Total NFA states: 487",
+                ""
+              ],
+              "dfa_phase": [
+                "[INFO] Converting NFA to DFA (Subset Construction)...",
+                "[SUCCESS] Built 5 DFAs",
+                "  Total DFA states (before minimization): 852",
+                ""
+              ],
+              "minimization_phase": [
+                "[INFO] Minimizing DFAs (Hopcroft's Algorithm)...",
+                "[SUCCESS] Minimized 5 DFAs",
+                "  Total states after minimization: 634",
+                "  States reduced: 218 (25.6%)",
+                ""
+              ],
+              "iga_phase": [
+                "[INFO] Applying IGA (Improved Grouping Algorithm)...",
+                "  Computing expansion coefficients...",
+                "  Grouping compatible DFAs...",
+                "[SUCCESS] IGA grouping complete",
+                "  Groups created: 2",
+                "  Total states after IGA: 463",
+                "  States reduced from minimized: 171 (27.0%)",
+                "  Total reduction from original: 389 (45.7%)",
+                ""
+              ],
+              "testing_phase": [
+                "[INFO] Testing 341 filenames against grouped DFAs...",
+                "[PROGRESS] Processing... 100% complete",
+                "",
+                "[RESULTS] Detection Summary:",
+                "  ✓ True Positives:  341 (malicious files correctly detected)",
+                "  ✓ True Negatives:  0   (no benign files in dataset)",
+                "  ✗ False Positives: 0   (benign files wrongly flagged)",
+                "  ✗ False Negatives: 0   (malicious files missed)",
+                "  Detection Rate: 100.0%",
+                ""
+              ],
+              "sample_detections": [
+                "[SAMPLE DETECTIONS]",
+                "  ✓ report.pdf.exe -> Matched: double_extension",
+                "  ✓ doc.pdf‮exe -> Matched: unicode_rtlo",
+                "  ✓ file.pdf   .exe -> Matched: whitespace_padding",
+                "  ✓ update.iso -> Matched: mimic_legitimate",
+                "  ✓ safe.ＥＸＥ -> Matched: unicode_homoglyph",
+                ""
+              ],
+              "performance": [
+                "[PERFORMANCE METRICS]",
+                "  Total patterns: 5",
+                "  Total filenames tested: 341",
+                "  Average matching time: 0.023 ms per file",
+                "  Total execution time: 7.8 ms",
+                "  Memory usage (estimated): 89 KB",
+                ""
+              ]
+            },
+            "module_2_pda": {
+              "header": [
+                "",
+                "╔════════════════════════════════════════════════════════╗",
+                "║  MODULE 2: TCP Protocol Validation (PDA)              ║",
+                "║  Context-Free Languages - Level 2 Chomsky Hierarchy   ║",
+                "╚════════════════════════════════════════════════════════╝",
+                ""
+              ],
+              "loading_phase": [
+                "[INFO] Loading dataset: tcp_handshake_traces_expanded.jsonl",
+                "[SUCCESS] Loaded 75 TCP handshake traces",
+                "  Valid sequences: 15",
+                "  Invalid sequences: 60",
+                ""
+              ],
+              "pda_design": [
+                "[INFO] Building PDA for TCP 3-way handshake...",
+                "[PDA DESIGN]",
+                "  States: {q_start, q_syn_recv, q_synack_recv, q_accept, q_error}",
+                "  Stack alphabet: {SYN, SYN-ACK, BOTTOM}",
+                "  Transitions:",
+                "    q_start + SYN → q_syn_recv [PUSH SYN]",
+                "    q_syn_recv + SYN-ACK → q_synack_recv [PUSH SYN-ACK]",
+                "    q_synack_recv + ACK → q_accept [POP ALL]",
+                "[SUCCESS] PDA constructed",
+                ""
+              ],
+              "validation_phase": [
+                "[INFO] Validating 75 TCP traces...",
+                "[PROGRESS] Processing... 100% complete",
+                "",
+                "[RESULTS] Validation Summary:",
+                "  ✓ Valid sequences accepted: 15/15 (100.0%)",
+                "  ✓ Invalid sequences rejected: 60/60 (100.0%)",
+                "  ✗ False positives: 0",
+                "  ✗ False negatives: 0",
+                "  Validation accuracy: 100.0%",
+                ""
+              ],
+              "sample_traces": [
+                "[SAMPLE TRACE VALIDATIONS]",
+                "",
+                "Trace T001: [SYN, SYN-ACK, ACK]",
+                "  Step 1: SYN     | q_start → q_syn_recv     | Stack: [⊥] → [⊥, SYN]",
+                "  Step 2: SYN-ACK | q_syn_recv → q_synack_recv | Stack: [⊥, SYN] → [⊥, SYN, SYN-ACK]",
+                "  Step 3: ACK     | q_synack_recv → q_accept | Stack: [⊥, SYN, SYN-ACK] → [⊥]",
+                "  Result: ✓ VALID (handshake complete, stack cleared)",
+                "",
+                "Trace T008: [SYN, ACK]",
+                "  Step 1: SYN | q_start → q_syn_recv | Stack: [⊥] → [⊥, SYN]",
+                "  Step 2: ACK | q_syn_recv → q_error | Stack: [⊥, SYN] (ERROR: expected SYN-ACK)",
+                "  Result: ✗ INVALID (missing SYN-ACK)",
+                "",
+                "Trace T011: [ACK, SYN, SYN-ACK]",
+                "  Step 1: ACK | q_start → q_error | Stack: [⊥] (ERROR: unexpected ACK)",
+                "  Result: ✗ INVALID (wrong order)",
+                ""
+              ],
+              "performance": [
+                "[PERFORMANCE METRICS]",
+                "  Total traces validated: 75",
+                "  Average stack depth: 1.8",
+                "  Maximum stack depth: 3",
+                "  Average validation time: 0.012 ms per trace",
+                "  Total execution time: 0.9 ms",
+                ""
+              ]
+            },
+            "comparative_analysis": {
+              "header": [
+                "",
+                "╔════════════════════════════════════════════════════════╗",
+                "║  CHOMSKY HIERARCHY DEMONSTRATION                       ║",
+                "╚════════════════════════════════════════════════════════╝",
+                ""
+              ],
+              "comparison": [
+                "[THEORETICAL COMPARISON]",
+                "",
+                "┌─────────────────────┬──────────────────┬──────────────────┐",
+                "│ Aspect              │ DFA (Regular)    │ PDA (Context-Free)│",
+                "├─────────────────────┼──────────────────┼──────────────────┤",
+                "│ Memory              │ None (stateless) │ Stack            │",
+                "│ Chomsky Level       │ Type 3           │ Type 2           │",
+                "│ Can match patterns  │ ✓ Yes            │ ✓ Yes            │",
+                "│ Can count/match pairs│ ✗ No             │ ✓ Yes            │",
+                "│ Example task        │ *.exe detection  │ SYN-ACK pairing  │",
+                "└─────────────────────┴──────────────────┴──────────────────┘",
+                "",
+                "[KEY INSIGHTS]",
+                "1. DFA Limitation:",
+                "   - Cannot validate TCP handshakes because it requires matching",
+                "     SYN with SYN-ACK, then ACK (nested/paired structure)",
+                "   - No memory to track which packets have been seen",
+                "",
+                "2. PDA Advantage:",
+                "   - Stack provides memory to match packet pairs",
+                "   - Can push SYN, verify SYN-ACK matches, then pop on ACK",
+                "   - Essential for protocol validation",
+                "",
+                "3. Practical Application:",
+                "   - Pattern matching (filenames) → Use DFA (efficient)",
+                "   - Protocol validation (TCP) → Use PDA (necessary)",
+                ""
+              ]
+            },
+            "summary": {
+              "header": [
+                "",
+                "╔════════════════════════════════════════════════════════╗",
+                "║  EXECUTION SUMMARY                                     ║",
+                "╚════════════════════════════════════════════════════════╝",
+                ""
+              ],
+              "stats": [
+                "[OVERALL STATISTICS]",
+                "  DFA Module:",
+                "    - Patterns defined: 5",
+                "    - Filenames tested: 341",
+                "    - Detection accuracy: 100%",
+                "    - State reduction (IGA): 27.0%",
+                "    - Execution time: 7.8 ms",
+                "",
+                "  PDA Module:",
+                "    - Traces validated: 75",
+                "    - Validation accuracy: 100%",
+                "    - Max stack depth: 3",
+                "    - Execution time: 0.9 ms",
+                "",
+                "  Total execution time: 8.7 ms",
+                "  Results saved to: output/results.txt",
+                "  Metrics saved to: output/performance_metrics.txt",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "task_id": "11.2",
+          "description": "File output format (results.txt)",
+          "file_structure": {
+            "sections": [
+              {
+                "section": "Header",
+                "content": [
+                  "CS311 Security Simulator - Execution Results",
+                  "Timestamp: 2025-11-15 14:30:45",
+                  "Dataset: Malicious_file_trick_detection.jsonl (341 entries)",
+                  "Dataset: tcp_handshake_traces_expanded.jsonl (75 entries)",
+                  "=========================================="
+                ]
+              },
+              {
+                "section": "Module 1 - DFA Results",
+                "content": [
+                  "All detection results with pattern matches",
+                  "Performance metrics",
+                  "State reduction statistics"
+                ]
+              },
+              {
+                "section": "Module 2 - PDA Results",
+                "content": [
+                  "All validation results",
+                  "Detailed stack traces for invalid sequences",
+                  "Performance metrics"
+                ]
+              },
+              {
+                "section": "Comparative Analysis",
+                "content": [
+                  "Side-by-side comparison",
+                  "Theoretical insights",
+                  "Practical recommendations"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "task_id": "11.3",
+          "description": "File output format (performance_metrics.txt)",
+          "metrics_to_include": [
+            {
+              "category": "DFA Metrics",
+              "values": [
+                "total_patterns",
+                "total_nfa_states",
+                "total_dfa_states_before_minimization",
+                "total_dfa_states_after_minimization",
+                "total_dfa_states_after_iga",
+                "state_reduction_percentage_minimization",
+                "state_reduction_percentage_iga",
+                "total_state_reduction_percentage",
+                "filenames_tested",
+                "true_positives",
+                "false_positives",
+                "false_negatives",
+                "detection_accuracy",
+                "average_matching_time_ms",
+                "total_execution_time_ms",
+                "estimated_memory_kb"
+              ]
+            },
+            {
+              "category": "PDA Metrics",
+              "values": [
+                "total_traces",
+                "valid_traces",
+                "invalid_traces",
+                "correctly_accepted",
+                "correctly_rejected",
+                "false_positives",
+                "false_negatives",
+                "validation_accuracy",
+                "average_stack_depth",
+                "max_stack_depth",
+                "average_validation_time_ms",
+                "total_execution_time_ms"
+              ]
+            },
+            {
+              "category": "Comparative Metrics",
+              "values": [
+                "total_execution_time_ms",
+                "dfa_vs_pda_speed_ratio",
+                "dataset_size_difference",
+                "memory_efficiency_comparison"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    
+    "phase_12_testing": {
+      "step_number": 12,
+      "title": "Testing and Validation",
+      "estimated_time": "2 hours",
+      "tasks": [
+        {
+          "task_id": "12.1",
+          "description": "Unit testing",
+          "test_cases": [
+            {
+              "component": "RegexParser",
+              "tests": [
+                "Test simple regex: 'a*b'",
+                "Test alternation: 'a|b'",
+                "Test concatenation: 'abc'",
+                "Test Kleene star: 'a*'",
+                "Test complex pattern: '.*\\.exe",
+                "Test Unicode patterns"
+              ]
+            },
+            {
+              "component": "NFAToDFA",
+              "tests": [
+                "Test epsilon closure computation",
+                "Test move function",
+                "Test subset construction",
+                "Verify DFA accepts same strings as NFA"
+              ]
+            },
+            {
+              "component": "DFAMinimizer",
+              "tests": [
+                "Test partition refinement",
+                "Verify minimized DFA is equivalent",
+                "Test on already minimal DFA",
+                "Test on complex DFA"
+              ]
+            },
+            {
+              "component": "IGA",
+              "tests": [
+                "Test expansion coefficient calculation",
+                "Test grouping algorithm",
+                "Test DFA merging",
+                "Verify state reduction"
+              ]
+            },
+            {
+              "component": "PDA",
+              "tests": [
+                "Test valid handshake: [SYN, SYN-ACK, ACK]",
+                "Test incomplete: [SYN]",
+                "Test wrong order: [ACK, SYN, SYN-ACK]",
+                "Test missing packet: [SYN, ACK]",
+                "Test stack operations"
+              ]
+            }
+          ]
+        },
+        {
+          "task_id": "12.2",
+          "description": "Integration testing",
+          "tests": [
+            {
+              "test": "End-to-end DFA module",
+              "steps": [
+                "Load filename dataset",
+                "Build all DFAs",
+                "Apply IGA",
+                "Test all filenames",
+                "Verify 100% detection"
+              ]
+            },
+            {
+              "test": "End-to-end PDA module",
+              "steps": [
+                "Load TCP dataset",
+                "Build PDA",
+                "Validate all traces",
+                "Verify 100% accuracy"
+              ]
+            },
+            {
+              "test": "Full simulator run",
+              "steps": [
+                "Run both modules",
+                "Verify output files created",
+                "Check metrics correctness",
+                "Validate console output"
+              ]
+            }
+          ]
+        },
+        {
+          "task_id": "12.3",
+          "description": "Edge case testing",
+          "edge_cases": [
+            {
+              "case": "Empty filename",
+              "expected": "Reject or handle gracefully"
+            },
+            {
+              "case": "Very long filename (1000+ chars)",
+              "expected": "Process without crash"
+            },
+            {
+              "case": "Filename with all Unicode",
+              "expected": "Detect if matches pattern"
+            },
+            {
+              "case": "Empty TCP sequence []",
+              "expected": "Reject as invalid"
+            },
+            {
+              "case": "TCP sequence with unknown packet type",
+              "expected": "Reject or handle as error"
+            },
+            {
+              "case": "Very long TCP sequence (100+ packets)",
+              "expected": "Process correctly"
+            }
+          ]
+        }
+      ]
+    },
+    
+    "phase_13_documentation": {
+      "step_number": 13,
+      "title": "Documentation and Comments",
+      "estimated_time": "1.5 hours",
+      "tasks": [
+        {
+          "task_id": "13.1",
+          "description": "Code documentation",
+          "requirements": [
+            "Add file header comments to each .cpp/.h file",
+            "Document each class with purpose and usage",
+            "Document each function with parameters and return values",
+            "Add inline comments for complex algorithms",
+            "Include references to academic papers (Wang 2016, etc.)"
+          ],
+          "example_format": {
+            "file_header": [
+              "/**",
+              " * File: DFAModule.cpp",
+              " * Purpose: Implements DFA-based suspicious filename detection",
+              " * Author: [Your Name]",
+              " * Course: CS311 - Automata Theory",
+              " * Date: November 2025",
+              " * ",
+              " * This module demonstrates Regular Language (Type 3 Chomsky",
+              " * Hierarchy) pattern matching using Deterministic Finite Automata.",
+              " * Implements regex-to-NFA-to-DFA conversion with IGA optimization.",
+              " * ",
+              " * References:",
+              " * - Wang (2016): IGA for network intrusion detection",
+              " * - Hopcroft et al. (2007): Introduction to Automata Theory",
+              " */"
+            ],
+            "function_comment": [
+              "/**",
+              " * Converts NFA to DFA using Subset Construction algorithm",
+              " * ",
+              " * @param nfa The nondeterministic finite automaton to convert",
+              " * @return Equivalent deterministic finite automaton",
+              " * ",
+              " * Algorithm: Subset Construction (Powerset Construction)",
+              " * Time Complexity: O(2^n) worst case, where n = NFA states",
+              " * Space Complexity: O(2^n) for DFA state storage",
+              " * ",
+              " * Process:",
+              " * 1. Compute epsilon closure of NFA start state",
+              " * 2. Create DFA start state from this closure",
+              " * 3. For each unmarked DFA state and each alphabet symbol:",
+              " *    - Compute reachable NFA states",
+              " *    - Create new DFA state if not exists",
+              " *    - Add transition to DFA",
+              " * 4. DFA state is accepting if contains NFA accepting state",
+              " */"
+            ]
+          }
+        },
+        {
+          "task_id": "13.2",
+          "description": "Create README.md",
+          "sections": [
+            {
+              "section": "Project Overview",
+              "content": "Brief description, objectives, Chomsky Hierarchy demonstration"
+            },
+            {
+              "section": "Requirements",
+              "content": "C++17, nlohmann/json, datasets"
+            },
+            {
+              "section": "Installation",
+              "content": "Step-by-step compilation instructions"
+            },
+            {
+              "section": "Usage",
+              "content": "How to run the simulator, command-line options"
+            },
+            {
+              "section": "Project Structure",
+              "content": "Directory layout, file descriptions"
+            },
+            {
+              "section": "Datasets",
+              "content": "Description of both datasets, sources"
+            },
+            {
+              "section": "Algorithms Implemented",
+              "content": "Thompson's Construction, Subset Construction, Hopcroft's Algorithm, IGA, PDA design"
+            },
+            {
+              "section": "Results",
+              "content": "Expected output, performance metrics"
+            },
+            {
+              "section": "References",
+              "content": "Academic papers cited"
+            }
+          ]
+        },
+        {
+          "task_id": "13.3",
+          "description": "Create user guide document",
+          "content": [
+            "How to interpret results",
+            "Understanding DFA state reduction",
+            "Understanding PDA stack operations",
+            "Troubleshooting common issues"
+          ]
+        }
+      ]
+    },
+    
+    "phase_14_optimization": {
+      "step_number": 14,
+      "title": "Performance Optimization (Optional)",
+      "estimated_time": "1-2 hours",
+      "tasks": [
+        {
+          "task_id": "14.1",
+          "description": "Memory optimization",
+          "techniques": [
+            "Use move semantics for large data structures",
+            "Reserve vector capacity to avoid reallocations",
+            "Use unordered_map instead of map where ordering not needed",
+            "Minimize string copies"
+          ]
+        },
+        {
+          "task_id": "14.2",
+          "description": "Speed optimization",
+          "techniques": [
+            "Inline small frequently-called functions",
+            "Use const references for read-only parameters",
+            "Cache epsilon closures to avoid recomputation",
+            "Use lookup tables for character classification"
+          ]
+        },
+        {
+          "task_id": "14.3",
+          "description": "Code profiling",
+          "tools": [
+            "gprof for execution profiling",
+            "valgrind for memory profiling",
+            "Identify bottlenecks",
+            "Optimize hot paths"
+          ]
+        }
+      ]
+    },
+    
+    "phase_15_final_delivery": {
+      "step_number": 15,
+      "title": "Final Delivery Preparation",
+      "estimated_time": "1 hour",
+      "tasks": [
+        {
+          "task_id": "15.1",
+          "description": "Prepare deliverables",
+          "items": [
+            {
+              "item": "Source code",
+              "format": "Complete C++ project with all files"
+            },
+            {
+              "item": "Datasets",
+              "files": [
+                "Malicious_file_trick_detection.jsonl",
+                "tcp_handshake_traces_expanded.jsonl"
+              ]
+            },
+            {
+              "item": "Executable",
+              "platforms": "Windows .exe and/or Linux binary"
+            },
+            {
+              "item": "Documentation",
+              "files": [
+                "README.md",
+                "User Guide",
+                "API Documentation"
+              ]
+            },
+            {
+              "item": "Results",
+              "files": [
+                "output/results.txt",
+                "output/performance_metrics.txt",
+                "screenshots of console output"
+              ]
+            },
+            {
+              "item": "Presentation",
+              "format": "PowerPoint/PDF with demo screenshots"
+            },
+            {
+              "item": "Report",
+              "content": "Academic paper with methodology, results, analysis"
+            }
+          ]
+        },
+        {
+          "task_id": "15.2",
+          "description": "Prepare presentation",
+          "slides": [
+            {
+              "slide": 1,
+              "title": "Title Slide",
+              "content": "Project title, authors, date"
+            },
+            {
+              "slide": 2,
+              "title": "Problem Statement",
+              "content": "Filename detection challenges, state explosion, need for protocol validation"
+            },
+            {
+              "slide": 3,
+              "title": "Chomsky Hierarchy",
+              "content": "Diagram showing Type 3 (Regular) vs Type 2 (Context-Free)"
+            },
+            {
+              "slide": 4,
+              "title": "Module 1: DFA (Regular Languages)",
+              "content": "Regex patterns, NFA construction, DFA conversion, IGA optimization"
+            },
+            {
+              "slide": 5,
+              "title": "IGA Results",
+              "content": "State reduction graphs, performance improvements"
+            },
+            {
+              "slide": 6,
+              "title": "Module 2: PDA (Context-Free Languages)",
+              "content": "TCP handshake validation, PDA design, stack operations"
+            },
+            {
+              "slide": 7,
+              "title": "PDA Results",
+              "content": "Validation accuracy, sample traces with stack visualization"
+            },
+            {
+              "slide": 8,
+              "title": "Comparative Analysis",
+              "content": "DFA vs PDA table, when to use each"
+            },
+            {
+              "slide": 9,
+              "title": "Demo",
+              "content": "Live demonstration or video of simulator running"
+            },
+            {
+              "slide": 10,
+              "title": "Conclusions",
+              "content": "Key findings, theoretical insights, future work"
+            }
+          ]
+        },
+        {
+          "task_id": "15.3",
+          "description": "Final testing",
+          "checklist": [
+            "Run on clean machine to verify no missing dependencies",
+            "Test with both datasets",
+            "Verify output files are generated correctly",
+            "Check console output formatting",
+            "Test all command-line arguments (if implemented)",
+            "Verify performance metrics are accurate",
+            "Check memory usage is reasonable",
+            "Test edge cases one final time",
+            "Verify all documentation is up to date",
+            "Spell check all output text",
+            "Test compilation on target platform"
+          ]
+        }
+      ]
+    }
+  },
+  
+  "compilation_instructions": {
+    "using_g++": {
+      "simple_compilation": {
+        "command": "g++ -std=c++17 -Wall -Wextra -O2 -I./include -o simulator src/*.cpp",
+        "notes": "Compile all .cpp files at once"
+      },
+      "separate_compilation": {
+        "commands": [
+          "g++ -std=c++17 -c -I./include src/Utils.cpp -o obj/Utils.o",
+          "g++ -std=c++17 -c -I./include src/JSONParser.cpp -o obj/JSONParser.o",
+          "g++ -std=c++17 -c -I./include src/RegexParser.cpp -o obj/RegexParser.o",
+          "g++ -std=c++17 -c -I./include src/NFAToDFA.cpp -o obj/NFAToDFA.o",
+          "g++ -std=c++17 -c -I./include src/DFAMinimizer.cpp -o obj/DFAMinimizer.o",
+          "g++ -std=c++17 -c -I./include src/IGA.cpp -o obj/IGA.o",
+          "g++ -std=c++17 -c -I./include src/DFAModule.cpp -o obj/DFAModule.o",
+          "g++ -std=c++17 -c -I./include src/PDAModule.cpp -o obj/PDAModule.o",
+          "g++ -std=c++17 -c -I./include src/main.cpp -o obj/main.o",
+          "g++ -o simulator obj/*.o"
+        ]
+      }
+    },
+    "using_cmake": {
+      "CMakeLists.txt": [
+        "cmake_minimum_required(VERSION 3.10)",
+        "project(CS311_Simulator)",
+        "",
+        "set(CMAKE_CXX_STANDARD 17)",
+        "set(CMAKE_CXX_STANDARD_REQUIRED ON)",
+        "",
+        "include_directories(include)",
+        "",
+        "add_executable(simulator",
+        "    src/main.cpp",
+        "    src/Utils.cpp",
+        "    src/JSONParser.cpp",
+        "    src/RegexParser.cpp",
+        "    src/NFAToDFA.cpp",
+        "    src/DFAMinimizer.cpp",
+        "    src/IGA.cpp",
+        "    src/DFAModule.cpp",
+        "    src/PDAModule.cpp",
+        ")",
+        "",
+        "# Add warnings",
+        "target_compile_options(simulator PRIVATE -Wall -Wextra)",
+        "",
+        "# Optimization",
+        "target_compile_options(simulator PRIVATE -O2)"
+      ],
+      "build_commands": [
+        "mkdir build",
+        "cd build",
+        "cmake ..",
+        "cmake --build .",
+        "./simulator"
+      ]
+    },
+    "using_makefile": {
+      "Makefile": [
+        "CXX = g++",
+        "CXXFLAGS = -std=c++17 -Wall -Wextra -O2 -I./include",
+        "TARGET = simulator",
+        "SRCDIR = src",
+        "OBJDIR = obj",
+        "",
+        "SOURCES = $(wildcard $(SRCDIR)/*.cpp)",
+        "OBJECTS = $(patsubst $(SRCDIR)/%.cpp,$(OBJDIR)/%.o,$(SOURCES))",
+        "",
+        "all: $(TARGET)",
+        "",
+        "$(TARGET): $(OBJECTS)",
+        "\t$(CXX) $(OBJECTS) -o $(TARGET)",
+        "",
+        "$(OBJDIR)/%.o: $(SRCDIR)/%.cpp",
+        "\t@mkdir -p $(OBJDIR)",
+        "\t$(CXX) $(CXXFLAGS) -c $< -o $@",
+        "",
+        "clean:",
+        "\trm -rf $(OBJDIR) $(TARGET)",
+        "",
+        "run: $(TARGET)",
+        "\t./$(TARGET)",
+        "",
+        ".PHONY: all clean run"
+      ],
+      "commands": [
+        "make",
+        "make run",
+        "make clean"
+      ]
+    }
+  },
+  
+  "expected_results": {
+    "dfa_module_results": {
+      "state_reduction": {
+        "original_dfa_states": "800-900 states",
+        "after_minimization": "600-700 states (20-25% reduction)",
+        "after_iga": "450-550 states (additional 20-30% reduction)",
+        "total_reduction": "40-50% from original"
+      },
+      "detection_performance": {
+        "accuracy": "100% (all 341 malicious files detected)",
+        "false_positives": "0 (no benign files in dataset)",
+        "false_negatives": "0 (no malicious files missed)",
+        "speed": "< 0.1 ms per filename"
+      }
+    },
+    "pda_module_results": {
+      "validation_accuracy": {
+        "valid_traces_accepted": "15/15 (100%)",
+        "invalid_traces_rejected": "60/60 (100%)",
+        "overall_accuracy": "100%"
+      },
+      "stack_metrics": {
+        "average_depth": "1.5-2.0",
+        "maximum_depth": "2-3",
+        "typical_operations": "2-3 push/pop per valid handshake"
+      }
+    },
+    "performance_comparison": {
+      "dfa_execution_time": "5-10 ms (341 files)",
+      "pda_execution_time": "0.5-1 ms (75 traces)",
+      "total_time": "< 15 ms",
+      "memory_usage": "< 200 KB total"
+    }
+  },
+  
+  "troubleshooting": {
+    "common_issues": [
+      {
+        "issue": "Compilation error: json.hpp not found",
+        "solution": "Download nlohmann/json.hpp to include/ directory or install via package manager"
+      },
+      {
+        "issue": "Runtime error: dataset file not found",
+        "solution": "Ensure datasets are in archive/ directory and paths are correct in code"
+      },
+      {
+        "issue": "Segmentation fault in NFA construction",
+        "solution": "Check for null pointers, validate regex syntax, ensure proper state initialization"
+      },
+      {
+        "issue": "DFA has too many states (memory issue)",
+        "solution": "Implement state limit, optimize regex patterns, ensure minimization works correctly"
+      },
+      {
+        "issue": "PDA incorrectly accepts/rejects sequences",
+        "solution": "Review transition rules, verify stack operations, check acceptance conditions"
+      },
+      {
+        "issue": "Unicode characters not handled correctly",
+        "solution": "Ensure UTF-8 encoding, use wide characters (wchar_t) if needed, test with actual Unicode files"
+      },
+      {
+        "issue": "Performance is too slow",
+        "solution": "Profile code, optimize hot paths, use move semantics, minimize string copies"
+      },
+      {
+        "issue": "IGA not reducing states as expected",
+        "solution": "Verify expansion coefficient calculation, check grouping threshold, debug merge process"
+      }
+    ]
+  },
+  
+  "presentation_tips": {
+    "demo_preparation": [
+      "Prepare 2-3 sample filenames to test live",
+      "Prepare 2-3 TCP traces to show step-by-step",
+      "Have screenshots ready as backup",
+      "Test demo on presentation machine beforehand",
+      "Prepare to explain any unexpected results"
+    ],
+    "key_points_to_emphasize": [
+      "Chomsky Hierarchy: Clear distinction between Regular and Context-Free",
+      "State explosion problem: Show numbers before and after IGA",
+      "DFA limitation: Explain why it cannot do TCP validation",
+      "PDA necessity: Show how stack enables protocol validation",
+      "Practical applications: Real-world security use cases",
+      "Performance gains: Quantify improvements from IGA"
+    ],
+    "questions_to_prepare_for": [
+      "Why use IGA instead of simpler grouping?",
+      "Can DFA be extended to handle TCP validation?",
+      "What is the complexity of your algorithms?",
+      "How does this compare to existing security tools?",
+      "What are the limitations of your approach?",
+      "How would you handle encrypted filenames?",
+      "Can this scale to thousands of patterns?",
+      "What happens with false positives in real deployment?"
+    ]
+  },
+  
+  "grading_criteria_alignment": {
+    "implementation": {
+      "regex_to_nfa": "20%",
+      "nfa_to_dfa": "15%",
+      "dfa_minimization": "15%",
+      "iga_integration": "15%",
+      "pda_design": "20%",
+      "dataset_handling": "5%",
+      "code_quality": "10%"
+    },
+    "documentation": {
+      "code_comments": "20%",
+      "readme_and_user_guide": "30%",
+      "technical_report": "30%",
+      "presentation_slides": "20%"
+    },
+    "demonstration": {
+      "theoretical_understanding": "30%",
+      "working_implementation": "40%",
+      "performance_analysis": "15%",
+      "presentation_clarity": "15%"
+    }
+  },
+  
+  "timeline_summary": {
+    "week_1": [
+      "Phase 1: Setup (Day 1)",
+      "Phase 2: Data structures (Day 2)",
+      "Phase 3: JSON parser (Day 3)",
+      "Phase 4: Regex to NFA (Days 4-5)"
+    ],
+    "week_2": [
+      "Phase 5: NFA to DFA (Days 1-2)",
+      "Phase 6: DFA minimization (Day 3)",
+      "Phase 7: IGA implementation (Days 4-5)"
+    ],
+    "week_3": [
+      "Phase 8: DFA module (Days 1-2)",
+      "Phase 9: PDA module (Days 3-4)",
+      "Phase 10: Main program (Day 5)"
+    ],
+    "week_4": [
+      "Phase 11: Output formatting (Day 1)",
+      "Phase 12: Testing (Days 2-3)",
+      "Phase 13: Documentation (Day 4)",
+      "Phase 14-15: Optimization and delivery (Day 5)"
+    ]
+  },
+  
+  "key_academic_references": {
+    "required_citations": [
+      {
+        "author": "Wang (2016)",
+        "title": "Improved Grouping Algorithm for network intrusion detection",
+        "use": "IGA algorithm, expansion coefficient, state reduction metrics"
+      },
+      {
+        "author": "Hopcroft et al. (2007)",
+        "title": "Introduction to Automata Theory, Languages, and Computation",
+        "use": "Automata theory foundations, DFA minimization, PDA design"
+      },
+      {
+        "author": "Kumar et al. (2006)",
+        "title": "DFA optimization techniques for packet inspection",
+        "use": "Background on state explosion problem"
+      },
+      {
+        "author": "Yu et al. (2006)",
+        "title": "DFA-based grouping for regex matching",
+        "use": "Original grouping approach that IGA improves upon"
+      }
+    ]
+  },
+  
+  "final_checklist": {
+    "before_submission": [
+      "☐ All source code files complete and compilable",
+      "☐ Both datasets in archive/ directory",
+      "☐ README.md with clear instructions",
+      "☐ Code properly commented",
+      "☐ Output files demonstrate correct execution",
+      "☐ Performance metrics match expected ranges",
+      "☐ No compiler warnings",
+      "☐ No memory leaks (verified with valgrind)",
+      "☐ All algorithms implemented as specified",
+      "☐ Presentation slides prepared",
+      "☐ Technical report completed",
+      "☐ Demo tested and working",
+      "☐ All references properly cited",
+      "☐ Submission package organized"
+    ]
+  },
+  
+  "success_metrics": {
+    "minimum_requirements": {
+      "dfa_state_reduction": ">= 20%",
+      "detection_accuracy": ">= 95%",
+      "pda_validation_accuracy": ">= 95%",
+      "execution_time": "< 100 ms total",
+      "code_compiles": "without errors"
+    },
+    "target_goals": {
+      "dfa_state_reduction": "25-30% (matching Wang 2016)",
+      "detection_accuracy": "100%",
+      "pda_validation_accuracy": "100%",
+      "execution_time": "< 20 ms total",
+      "code_quality": "well-documented, modular"
+    },
+    "excellent_performance": {
+      "dfa_state_reduction": ">= 30%",
+      "detection_accuracy": "100% with no false positives",
+      "pda_validation_accuracy": "100%",
+      "execution_time": "< 10 ms total",
+      "code_quality": "publication-ready",
+      "additional_features": "GUI, visualization, extended patterns"
+    }
+  },
+  
+  "notes": {
+    "important_reminders": [
+      "Focus on correctness first, then optimization",
+      "Test incrementally - don't wait until the end",
+      "Keep backups of working code before major changes",
+      "Document as you code, not at the end",
+      "Ask professor for clarification if anything is unclear",
+      "Start early - automata algorithms can be tricky",
+      "Use version control (git) to track changes",
+      "Test with actual datasets regularly",
+      "Prepare for demo failures - have backups ready",
+      "Understand the theory deeply - you'll need to explain it"
+    ],
+    "optional_enhancements": [
+      "Graphical visualization of DFA/NFA states",
+      "Interactive mode to test custom patterns",
+      "Export DFA diagrams to DOT format",
+      "Parallel processing for multiple files",
+      "Web interface for easy testing",
+      "Real-time network traffic capture integration",
+      "Machine learning integration for pattern discovery",
+      "Extended protocol support (HTTP, FTP, etc.)",
+      "Compression of DFA transition tables",
+      "Benchmark suite with performance graphs"
+    ]
+  }
+}
