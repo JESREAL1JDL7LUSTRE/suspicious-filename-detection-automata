@@ -4,6 +4,8 @@
         "chrono": "cpp",
         "iostream": "cpp",
         "stdexcept": "cpp",
-        "cctype": "cpp"
+        "cctype": "cpp",
+        "algorithm": "cpp",
+        "ostream": "cpp"
     }
 }

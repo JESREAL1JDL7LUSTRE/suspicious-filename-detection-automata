@@ -163,24 +163,66 @@ void DFAModule::testPatterns() {
     std::cout << "[SUCCESS] Testing complete" << std::endl;
     std::cout << "  Detection accuracy: " << metrics.detection_accuracy << "%\n" << std::endl;
 }
-
 bool DFAModule::testFilename(const std::string& filename, std::string& matched_pattern) {
     std::string lower = filename;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
     
-    // Enhanced pattern matching
-    if (filename.find(".exe") != std::string::npos || 
-        filename.find(".scr") != std::string::npos || 
-        filename.find(".bat") != std::string::npos ||
-        filename.find(".com") != std::string::npos ||
-        filename.find(".vbs") != std::string::npos ||
-        filename.find(".pif") != std::string::npos ||
-        filename.find(".lnk") != std::string::npos ||
-        filename.find(".js") != std::string::npos ||
-        filename.find(".vbe") != std::string::npos ||
-        filename.find(".hta") != std::string::npos) {
-        matched_pattern = "suspicious_extension";
+    // === Pattern 1: All Suspicious Extensions ===
+    std::vector<std::string> extensions = {
+        ".exe", ".scr", ".bat", ".com", ".vbs", ".vbe", ".js", ".jse",
+        ".pif", ".lnk", ".hta", ".iso", ".img", ".msi", ".ps1", ".jar",
+        ".dll", ".cpl", ".inf", ".reg", ".url", ".cmd", ".wsf", ".wsh"
+    };
+    
+    for (const auto& ext : extensions) {
+        if (lower.find(ext) != std::string::npos) {
+            matched_pattern = "suspicious_extension";
+            return true;
+        }
+    }
+    
+    // === Pattern 2: Unicode Tricks (non-ASCII characters) ===
+    for (unsigned char c : filename) {
+        if (c > 127) {  // Non-ASCII
+            matched_pattern = "unicode_trick";
+            return true;
+        }
+    }
+    
+    // === Pattern 3: Double Extension ===
+    // Count dots in filename
+    int dot_count = 0;
+    for (char c : filename) {
+        if (c == '.') dot_count++;
+    }
+    if (dot_count >= 2) {
+        matched_pattern = "double_extension";
         return true;
+    }
+    
+    // === Pattern 4: Whitespace Padding (2+ spaces) ===
+    if (filename.find("  ") != std::string::npos ||   // 2 spaces
+        filename.find("   ") != std::string::npos) {  // 3 spaces
+        matched_pattern = "whitespace_padding";
+        return true;
+    }
+    
+    // === Pattern 5: Mimic Legitimate (update, patch, installer, etc.) ===
+    std::vector<std::string> suspicious_words = {
+        "update", "patch", "installer", "setup", "install",
+        "crack", "keygen", "activator", "loader"
+    };
+    
+    for (const auto& word : suspicious_words) {
+        if (lower.find(word) != std::string::npos) {
+            // Only flag if it also has suspicious extension or characteristics
+            for (const auto& ext : {".iso", ".img", ".msi", ".exe"}) {
+                if (lower.find(ext) != std::string::npos) {
+                    matched_pattern = "mimic_legitimate";
+                    return true;
+                }
+            }
+        }
     }
     
     return false;
