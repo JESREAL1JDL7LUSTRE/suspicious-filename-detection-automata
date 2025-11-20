@@ -1,5 +1,8 @@
+/**
+ * PDAModule.h - IMPROVED VERSION
+ * Header for PDA-based protocol validation module
+ */
 
-/** PDAModule.h **/
 #ifndef PDAMODULE_H
 #define PDAMODULE_H
 
@@ -10,22 +13,40 @@
 
 namespace CS311 {
 
+// PDA States for TCP handshake
+enum PDAStates {
+    Q_START = 0,
+    Q_SYN_RECEIVED = 1,
+    Q_SYNACK_RECEIVED = 2,
+    Q_ACCEPT = 3,
+    Q_ERROR = 4
+};
+
 class PDAModule {
-public:
-    PDAModule();
-    void loadDataset(const std::string& filepath);
-    void buildPDA();
-    bool validateSequence(const std::vector<std::string>& sequence);
-    void testAllTraces();
-    void showStackOperations(const std::vector<std::string>& sequence);
-    void generateReport();
-    const PDAMetrics& getMetrics() const { return metrics; }
 private:
     std::vector<TCPTrace> dataset;
     PDA pda;
     PDAMetrics metrics;
-    enum TCPState { Q_START = 0, Q_SYN_RECEIVED = 1, Q_SYNACK_RECEIVED = 2, Q_ACCEPT = 3, Q_ERROR = -1 };
+    
+    // Process a single packet
     bool processPacket(const std::string& packet, std::vector<std::string>& operations);
+    
+    // Validate a sequence of packets
+    bool validateSequence(const std::vector<std::string>& sequence);
+
+public:
+    PDAModule();
+    
+    // Module pipeline
+    void loadDataset(const std::string& filepath);
+    void defineCFG();          // NEW: Explicitly show the CFG
+    void buildPDA();           // Build PDA from CFG
+    void testAllTraces();      // Test all traces
+    void showStackOperations(const std::vector<std::string>& sequence);
+    void generateReport();
+    
+    // Getters
+    const PDAMetrics& getMetrics() const { return metrics; }
 };
 
 } // namespace CS311
