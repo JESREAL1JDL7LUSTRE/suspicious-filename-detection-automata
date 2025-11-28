@@ -2,14 +2,23 @@ import { useCallback, useState, useRef } from 'react'
 
 const API_URL = '' // Use proxy from vite.config
 
-export function useSimulator(onComplete?: () => void) {
+export interface ScanResult {
+  file: string
+  path: string
+  status: 'suspicious' | 'safe'
+  severity: 'high' | 'medium' | 'low' | 'safe'
+  pattern: string | null
+  color: 'red' | 'yellow' | 'orange' | 'blue'
+}
+
+export function useFileScan(onComplete?: (results: ScanResult[]) => void) {
   const [terminalOutput, setTerminalOutput] = useState<string[]>([])
-  const [isRunning, setIsRunning] = useState(false)
-  const [hasRunSimulator, setHasRunSimulator] = useState(false)
+  const [isScanning, setIsScanning] = useState(false)
+  const [scanResults, setScanResults] = useState<ScanResult[]>([])
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  const runSimulator = useCallback(async () => {
-    // Cancel any existing run
+  const scanFiles = useCallback(async (files: File[]) => {
+    // Cancel any existing scan
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
@@ -18,32 +27,34 @@ export function useSimulator(onComplete?: () => void) {
     const abortController = new AbortController()
     abortControllerRef.current = abortController
 
-    setIsRunning(true)
+    setIsScanning(true)
     setTerminalOutput([])
-    setHasRunSimulator(false) // Reset when starting a new run
+    setScanResults([])
 
     try {
-      console.log('Starting fetch request to /api/run-simulator')
+      // Extract file paths/names from File objects
+      const filePaths = files.map(f => f.name)
       
-      // Use a separate try-catch for the fetch itself
+      console.log('Starting scan request for', filePaths.length, 'files')
+      
       let response: Response
       try {
-        response = await fetch(`${API_URL}/api/run-simulator`, {
+        response = await fetch(`${API_URL}/api/scan`, {
           method: 'POST',
           signal: abortController.signal,
           headers: {
             'Accept': 'text/event-stream',
+            'Content-Type': 'application/json',
           },
+          body: JSON.stringify({ files: filePaths }),
         })
       } catch (fetchError: any) {
         console.error('Fetch error:', fetchError)
         if (fetchError.name === 'AbortError') {
-          throw fetchError // Re-throw abort errors
+          throw fetchError
         }
         throw new Error(`Failed to connect: ${fetchError.message}`)
       }
-
-      console.log('Response received, status:', response.status, 'ok:', response.ok)
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -56,36 +67,22 @@ export function useSimulator(onComplete?: () => void) {
         throw new Error('No response body')
       }
 
-      console.log('Starting to read stream...')
       let buffer = ''
+      const results: ScanResult[] = []
 
-      // Read stream in a loop
       const readStream = async () => {
         try {
-          let hasReceivedData = false
           while (true) {
             if (abortController.signal.aborted) {
-              console.log('Stream aborted by user')
-              try {
-                reader.cancel()
-              } catch (e) {
-                console.error('Error cancelling reader:', e)
-              }
+              reader.cancel()
               break
             }
 
             const { done, value } = await reader.read()
 
             if (done) {
-              console.log('Stream done, received data:', hasReceivedData)
-              if (!hasReceivedData) {
-                console.warn('Stream ended without receiving any data')
-                setTerminalOutput((prev) => [...prev, '\n[Warning: Stream ended without data]\n'])
-              }
               break
             }
-
-            hasReceivedData = true
 
             buffer += decoder.decode(value, { stream: true })
             const lines = buffer.split('\n\n')
@@ -95,30 +92,34 @@ export function useSimulator(onComplete?: () => void) {
               if (line.startsWith('data: ')) {
                 try {
                   const data = JSON.parse(line.substring(6))
-                  console.log('Received SSE data type:', data.type)
                   
-                  if (data.type === 'stdout' || data.type === 'stderr') {
+                  if (data.type === 'start' || data.type === 'scan_progress' || data.type === 'scan_summary') {
+                    setTerminalOutput((prev) => [...prev, data.message])
+                  } else                   if (data.type === 'scan_result') {
+                    setTerminalOutput((prev) => [...prev, data.message])
+                    if (data.result) {
+                      results.push(data.result)
+                      // Update scan results progressively (one by one)
+                      setScanResults((prev) => [...prev, data.result])
+                    }
+                  } else if (data.type === 'scan_progress') {
+                    setTerminalOutput((prev) => [...prev, data.message])
+                  } else if (data.type === 'scan_summary') {
                     setTerminalOutput((prev) => [...prev, data.message])
                   } else if (data.type === 'end') {
-                    // Check if simulator completed successfully (code 0)
-                    const success = data.code === 0
-                    if (success) {
-                      setHasRunSimulator(true) // Enable Load Automata button
+                    setTerminalOutput((prev) => [...prev, data.message])
+                    setIsScanning(false)
+                    if (data.results) {
+                      setScanResults(data.results)
                       if (onComplete) {
-                        onComplete()
+                        onComplete(data.results)
                       }
-                    } else {
-                      setHasRunSimulator(false) // Don't enable if it failed
                     }
-                    setIsRunning(false)
-                    return // Exit the read loop
+                    return
                   } else if (data.type === 'error') {
                     setTerminalOutput((prev) => [...prev, data.message])
-                    setIsRunning(false)
-                    setHasRunSimulator(false) // Don't enable if there was an error
-                    return // Exit the read loop
-                  } else if (data.type === 'start') {
-                    setTerminalOutput((prev) => [...prev, data.message])
+                    setIsScanning(false)
+                    return
                   }
                 } catch (e) {
                   console.error('Error parsing SSE data:', e, 'Line:', line)
@@ -130,55 +131,47 @@ export function useSimulator(onComplete?: () => void) {
           console.error('Stream read error:', streamError)
           if (streamError instanceof Error && streamError.name !== 'AbortError') {
             setTerminalOutput((prev) => [...prev, `\n[Stream error: ${streamError.message}]\n`])
-            setIsRunning(false)
-          } else if (streamError instanceof Error && streamError.name === 'AbortError') {
-            console.log('Stream read aborted')
-          } else {
-            const errorMessage = streamError instanceof Error ? streamError.message : String(streamError)
-            setTerminalOutput((prev) => [...prev, `\n[Stream error: ${errorMessage}]\n`])
-            setIsRunning(false)
           }
+          setIsScanning(false)
         }
       }
 
       await readStream()
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        setTerminalOutput((prev) => [...prev, '\n[Process cancelled]\n'])
+        setTerminalOutput((prev) => [...prev, '\n[Scan cancelled]\n'])
       } else {
         const msg = error instanceof Error ? error.message : String(error)
         setTerminalOutput((prev) => [...prev, `\n[Error: ${msg}]\n`])
       }
-      setIsRunning(false)
-      setHasRunSimulator(false) // Don't enable if there was an error
+      setIsScanning(false)
     }
   }, [onComplete])
 
-  const stopSimulator = useCallback(() => {
+  const stopScan = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
       abortControllerRef.current = null
     }
-    setIsRunning(false)
-    setHasRunSimulator(false) // Reset since we stopped it
+    setIsScanning(false)
   }, [])
 
   const reset = useCallback(() => {
+    setTerminalOutput([])
+    setScanResults([])
+    setIsScanning(false)
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
       abortControllerRef.current = null
     }
-    setTerminalOutput([])
-    setIsRunning(false)
-    setHasRunSimulator(false)
   }, [])
 
   return {
     terminalOutput,
-    isRunning,
-    hasRunSimulator,
-    runSimulator,
-    stopSimulator,
+    isScanning,
+    scanResults,
+    scanFiles,
+    stopScan,
     reset
   }
 }

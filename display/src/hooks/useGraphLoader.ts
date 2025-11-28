@@ -24,15 +24,25 @@ export function useGraphLoader() {
   const loadGraph = useCallback(async () => {
     try {
       setStatus('Loading...')
+      console.log('Loading graph from:', `${outputDir}/${selected}`)
       const aj: AutomataJson = await fetchAutomataJson(`${outputDir}/${selected}`)
+      console.log('Loaded JSON:', aj)
       const gf = toReactFlowGraph(aj)
+      console.log('Converted to ReactFlow graph:', gf, 'Nodes:', gf.nodes.length, 'Edges:', gf.edges.length)
       setGraph(gf)
-      setStatus('Loaded')
+      setStatus(`Loaded - ${gf.nodes.length} nodes, ${gf.edges.length} edges`)
+      return Promise.resolve()
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
+      console.error('Error loading graph:', e)
       setStatus(`Error: ${msg}`)
+      return Promise.reject(e)
     }
   }, [outputDir, selected])
+
+  const resetGraph = useCallback(() => {
+    setGraph({ nodes: [], edges: [] })
+  }, [])
 
   return {
     graph,
@@ -41,7 +51,8 @@ export function useGraphLoader() {
     files,
     setSelected,
     loadGraph,
-    setStatus
+    setStatus,
+    resetGraph
   }
 }
 

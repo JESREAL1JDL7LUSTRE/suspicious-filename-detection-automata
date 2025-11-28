@@ -9,6 +9,7 @@ interface HeaderProps {
   onStopClick: () => void
   onLoadClick: () => void
   onFileChange: (file: string) => void
+  onReset: () => void
 }
 
 export function Header({
@@ -19,7 +20,8 @@ export function Header({
   onRunClick,
   onStopClick,
   onLoadClick,
-  onFileChange
+  onFileChange,
+  onReset
 }: HeaderProps) {
   return (
     <header className="w-full border-b bg-white">
@@ -51,6 +53,14 @@ export function Header({
             title={!hasRunSimulator ? "Run the simulator first to generate output files" : "Load the selected automata graph"}
           >
             Load Automata
+          </Button>
+          <Button
+            onClick={onReset}
+            variant="outline"
+            disabled={isRunning}
+            title="Reset all state"
+          >
+            Reset
           </Button>
         </div>
       </div>
