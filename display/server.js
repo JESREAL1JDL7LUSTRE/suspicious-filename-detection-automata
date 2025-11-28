@@ -207,6 +207,207 @@ app.post('/api/run-simulator', async (req, res) => {
 })
 
 // Health check endpoint
+// Scan endpoint - processes files/folders for suspicious patterns
+app.post('/api/scan', async (req, res) => {
+  console.log('Received scan request')
+  
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  
+  const { files: filePaths } = req.body
+  
+  if (!filePaths || filePaths.length === 0) {
+    res.write(`data: ${JSON.stringify({ type: 'error', message: 'No files provided\n' })}\n\n`)
+    res.end()
+    return
+  }
+  
+  res.write(`data: ${JSON.stringify({ type: 'start', message: '╔═══════════════════════════════════════════════════════════╗\n' })}\n\n`)
+  res.write(`data: ${JSON.stringify({ type: 'start', message: '║   FILE SCAN MODULE - SUSPICIOUS FILENAME DETECTION        ║\n' })}\n\n`)
+  res.write(`data: ${JSON.stringify({ type: 'start', message: '╚═══════════════════════════════════════════════════════════╝\n\n' })}\n\n`)
+  
+  res.write(`data: ${JSON.stringify({ type: 'start', message: '[INFO] Initializing scan module...\n' })}\n\n`)
+  res.write(`data: ${JSON.stringify({ type: 'start', message: `[INFO] Total files to scan: ${filePaths.length}\n` })}\n\n`)
+  
+  // DFA patterns (same as C++ code)
+  const patterns = [
+    { regex: /\.exe$/i, name: 'executable', severity: 'high', description: 'Executable file' },
+    { regex: /\.scr$/i, name: 'screensaver', severity: 'high', description: 'Screensaver file' },
+    { regex: /\.bat$/i, name: 'batch_file', severity: 'medium', description: 'Batch script' },
+    { regex: /\.vbs$/i, name: 'vbscript', severity: 'medium', description: 'VBScript file' },
+    { regex: /update/i, name: 'mimic_legitimate', severity: 'low', description: 'Mimics legitimate update file' }
+  ]
+  
+  res.write(`data: ${JSON.stringify({ type: 'start', message: '[INFO] Loaded detection patterns:\n' })}\n\n`)
+  patterns.forEach((p, idx) => {
+    res.write(`data: ${JSON.stringify({ type: 'start', message: `  Pattern ${idx + 1}: ${p.name} (${p.severity} risk) - ${p.description}\n` })}\n\n`)
+  })
+  res.write(`data: ${JSON.stringify({ type: 'start', message: '\n' })}\n\n`)
+  
+  const scanResults = []
+  let suspiciousCount = 0
+  let safeCount = 0
+  
+  try {
+    for (let i = 0; i < filePaths.length; i++) {
+      const filePath = filePaths[i]
+      const fileName = filePath.split(/[/\\]/).pop() || filePath
+      
+      res.write(`data: ${JSON.stringify({ 
+        type: 'scan_progress', 
+        message: `\n[${i + 1}/${filePaths.length}] Analyzing: ${fileName}\n`,
+        file: fileName,
+        index: i,
+        total: filePaths.length
+      })}\n\n`)
+      
+      res.write(`data: ${JSON.stringify({ 
+        type: 'scan_progress', 
+        message: `  → Extracting filename: ${fileName}\n`,
+      })}\n\n`)
+      
+      let detected = false
+      let matchedPattern = null
+      const checks = []
+      
+      // Check against patterns
+      for (const pattern of patterns) {
+        const matches = pattern.regex.test(fileName)
+        checks.push({ pattern: pattern.name, matches })
+        if (matches && !detected) {
+          detected = true
+          matchedPattern = pattern
+          res.write(`data: ${JSON.stringify({ 
+            type: 'scan_progress', 
+            message: `  → Pattern match: ${pattern.name} (${pattern.severity} risk)\n`,
+          })}\n\n`)
+        }
+      }
+      
+      // Check for double extensions
+      const dotCount = (fileName.match(/\./g) || []).length
+      if (dotCount >= 2 && !detected) {
+        detected = true
+        matchedPattern = { name: 'double_extension', severity: 'medium', description: 'Double extension detected' }
+        res.write(`data: ${JSON.stringify({ 
+          type: 'scan_progress', 
+          message: `  → Double extension detected (${dotCount} dots)\n`,
+        })}\n\n`)
+      }
+      
+      // Check for unicode tricks
+      const hasUnicode = /[^\x00-\x7F]/.test(fileName)
+      if (hasUnicode && !detected) {
+        detected = true
+        matchedPattern = { name: 'unicode_trick', severity: 'medium', description: 'Unicode characters detected' }
+        res.write(`data: ${JSON.stringify({ 
+          type: 'scan_progress', 
+          message: `  → Unicode characters detected\n`,
+        })}\n\n`)
+      }
+      
+      const status = detected ? 'suspicious' : 'safe'
+      const severity = detected ? matchedPattern.severity : 'safe'
+      
+      if (status === 'suspicious') {
+        suspiciousCount++
+      } else {
+        safeCount++
+      }
+      
+      scanResults.push({
+        file: fileName,
+        path: filePath,
+        status,
+        severity,
+        pattern: matchedPattern?.name || null
+      })
+      
+      const statusColor = status === 'suspicious' 
+        ? (severity === 'high' ? 'red' : severity === 'medium' ? 'yellow' : 'orange')
+        : 'blue'
+      
+      res.write(`data: ${JSON.stringify({ 
+        type: 'scan_result',
+        message: `  ✓ Result: ${status.toUpperCase()}${matchedPattern ? ` (${matchedPattern.name})` : ''}\n`,
+        result: {
+          file: fileName,
+          status,
+          severity,
+          pattern: matchedPattern?.name || null,
+          color: statusColor
+        }
+      })}\n\n`)
+    }
+    
+    // Summary
+    res.write(`data: ${JSON.stringify({ 
+      type: 'scan_summary',
+      message: `\n╔═══════════════════════════════════════════════════════════╗\n`
+    })}\n\n`)
+    res.write(`data: ${JSON.stringify({ 
+      type: 'scan_summary',
+      message: `║                    SCAN SUMMARY                          ║\n`
+    })}\n\n`)
+    res.write(`data: ${JSON.stringify({ 
+      type: 'scan_summary',
+      message: `╚═══════════════════════════════════════════════════════════╝\n\n`
+    })}\n\n`)
+    
+    res.write(`data: ${JSON.stringify({ 
+      type: 'scan_summary',
+      message: `[RESULTS]\n`
+    })}\n\n`)
+    res.write(`data: ${JSON.stringify({ 
+      type: 'scan_summary',
+      message: `  ✓ Safe files:        ${safeCount}\n`
+    })}\n\n`)
+    res.write(`data: ${JSON.stringify({ 
+      type: 'scan_summary',
+      message: `  ✗ Suspicious files:  ${suspiciousCount}\n`
+    })}\n\n`)
+    res.write(`data: ${JSON.stringify({ 
+      type: 'scan_summary',
+      message: `  Total scanned:       ${scanResults.length}\n\n`
+    })}\n\n`)
+    
+    if (suspiciousCount > 0) {
+      res.write(`data: ${JSON.stringify({ 
+        type: 'scan_summary',
+        message: `[SUSPICIOUS FILES DETECTED]\n`
+      })}\n\n`)
+      scanResults.filter(r => r.status === 'suspicious').forEach((result, idx) => {
+        res.write(`data: ${JSON.stringify({ 
+          type: 'scan_summary',
+          message: `  ${idx + 1}. ${result.file} (${result.pattern || 'unknown pattern'}, ${result.severity} risk)\n`
+        })}\n\n`)
+      })
+      res.write(`data: ${JSON.stringify({ 
+        type: 'scan_summary',
+        message: `\n`
+      })}\n\n`)
+    }
+    
+    res.write(`data: ${JSON.stringify({ 
+      type: 'end', 
+      code: 0,
+      results: scanResults,
+      message: '\nScan completed successfully\n'
+    })}\n\n`)
+    
+    res.end()
+  } catch (error) {
+    console.error('Scan error:', error)
+    res.write(`data: ${JSON.stringify({ 
+      type: 'error', 
+      message: `Scan error: ${error.message}\n`
+    })}\n\n`)
+    res.end()
+  }
+})
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', simulatorPath })
 })
