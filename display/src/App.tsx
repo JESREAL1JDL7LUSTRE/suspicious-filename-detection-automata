@@ -28,7 +28,7 @@ function App() {
           if (/^\/[A-Za-z]:/.test(filePath)) {
             filePath = filePath.substring(1)
           }
-          const match = filePath.match(/^(.+?)[\/\\]automatafrontend[\/\\]src[\/\\]/i)
+          const match = filePath.match(/^(.+?)[\/\\]display[\/\\]src[\/\\]/i)
           if (match) {
             return `${match[1].replace(/\\/g, '/')}/output`
           }

@@ -74,6 +74,8 @@ suspicious-filename-detection-automata/
 │   ├── build.ps1         # PowerShell build script (Windows)
 │   ├── build.bat         # Batch build script (Windows)
 │   └── generate_tcp_dataset.py  # Python script for generating TCP dataset
+├── display/              # Frontend visualization (React + TypeScript)
+│   └── (React app for visualizing automata graphs)
 ├── makefile              # Build configuration (for make)
 └── simulator.exe         # Compiled executable (generated)
 ```
