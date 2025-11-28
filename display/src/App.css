@@ -1,5 +1,5 @@
 #root {
-  max-width: 1280px;
+  max-width: 1480px;
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
@@ -39,4 +39,18 @@
 
 .read-the-docs {
   color: #888;
+}
+
+
+/* Terminal Scrollbar */
+/* For Chrome, Edge, Safari */
+.custom-scroll-bar {
+  overflow-y: scroll;
+}
+.custom-scroll-bar::-webkit-scrollbar {
+  display: none;          
+}
+.custom-scroll-bar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
