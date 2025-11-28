@@ -1,0 +1,22 @@
+digraph G {
+  rankdir=LR;
+  subgraph cluster_pda {
+    label="PDA (TCP Handshake)";
+    color=blue;
+    node [style=filled,color=white];
+    p_s0 [label="q0_start"];
+    p_s1 [label="q1_syn_recv"];
+    p_s2 [label="q2_synack_recv"];
+    p_s3 [label="q3_accept (accept)"];
+    p_s4 [label="q_error"];
+    p_s0 -> p_s1 [label="SYN"];
+    p_s1 -> p_s2 [label="SYN-ACK"];
+    p_s2 -> p_s3 [label="ACK"];
+    p_s3 -> p_s3 [label="DATA,ACK,FIN"];
+    p_s3 -> p_s1 [label="SYN (new)"];
+  }
+
+  start [shape=Mdiamond];
+  end [shape=Msquare];
+  start -> p_s0;
+}

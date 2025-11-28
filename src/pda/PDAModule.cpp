@@ -5,7 +5,9 @@
 
 #include "PDAModule.h"
 #include <iostream>
+#include <fstream>
 #include <chrono>
+#include <sstream>
 
 namespace CS311 {
 
@@ -284,6 +286,68 @@ void PDAModule::generateReport() {
     std::cout << "  • Cannot be recognized by finite automaton (DFA)" << std::endl;
     std::cout << "  • Requires unbounded memory for nested structures" << std::endl;
     std::cout << std::endl;
+
+    // Also write PDA report to output file
+    try {
+        std::ofstream out("output/pda_report.txt");
+        if (out.is_open()) {
+            out << "╔═══════════════════════════════════════════════════════════╗\n";
+            out << "║          PDA MODULE - VALIDATION RESULTS                  ║\n";
+            out << "╚═══════════════════════════════════════════════════════════╝\n";
+            out << "\n[VALIDATION METRICS]\n";
+            out << "  ✓ Valid accepted:       " << metrics.correctly_accepted << " / " << metrics.valid_traces << "\n";
+            out << "  ✓ Invalid rejected:     " << metrics.correctly_rejected << " / " << metrics.invalid_traces << "\n";
+            out << "  ✗ False positives:      " << metrics.false_positives << "\n";
+            out << "  ✗ False negatives:      " << metrics.false_negatives << "\n";
+            out << "  Validation accuracy:    " << metrics.validation_accuracy << "%\n";
+            out << "\n[STACK METRICS]\n";
+            out << "  Average stack depth:    " << metrics.avg_stack_depth << "\n";
+            out << "  Maximum stack depth:    " << metrics.max_stack_depth << "\n";
+            out << "\n[PERFORMANCE]\n";
+            out << "  Total traces:           " << metrics.total_traces << "\n";
+            out << "  Total execution time:   " << metrics.total_execution_time_ms << " ms\n";
+            out << "  Average per trace:      " << metrics.avg_validation_time_ms << " ms\n";
+            out.close();
+        }
+    } catch (...) {
+        // ignore file errors
+    }
+}
+
+// Export a Graphviz DOT snippet representing the PDA states and canonical transitions
+std::string PDAModule::exportGraphviz() const {
+    std::ostringstream ss;
+
+    if (pda.states.empty()) return ss.str();
+
+    ss << "  subgraph cluster_pda {\n";
+    ss << "    label=\"PDA (TCP Handshake)\";\n";
+    ss << "    color=blue;\n";
+    ss << "    node [style=filled,color=white];\n";
+
+    // Nodes
+    for (const auto& s : pda.states) {
+        std::string nodeName = "p_s" + std::to_string(s.id);
+        std::string label = s.label.empty() ? std::to_string(s.id) : s.label;
+        if (s.is_accepting) label += " (accept)";
+        ss << "    " << nodeName << " [label=\"" << escapeDotLabel(label) << "\"];\n";
+    }
+
+    // Canonical transitions derived from the PDA behavior implemented in PDAModule
+    auto hasState = [&](int id){ for (const auto& s : pda.states) if (s.id == id) return true; return false; };
+    if (hasState(Q_START) && hasState(Q_SYN_RECEIVED))
+        ss << "    p_s" << Q_START << " -> p_s" << Q_SYN_RECEIVED << " [label=\"SYN\"];\n";
+    if (hasState(Q_SYN_RECEIVED) && hasState(Q_SYNACK_RECEIVED))
+        ss << "    p_s" << Q_SYN_RECEIVED << " -> p_s" << Q_SYNACK_RECEIVED << " [label=\"SYN-ACK\"];\n";
+    if (hasState(Q_SYNACK_RECEIVED) && hasState(Q_ACCEPT))
+        ss << "    p_s" << Q_SYNACK_RECEIVED << " -> p_s" << Q_ACCEPT << " [label=\"ACK\"];\n";
+    if (hasState(Q_ACCEPT))
+        ss << "    p_s" << Q_ACCEPT << " -> p_s" << Q_ACCEPT << " [label=\"DATA,ACK,FIN\"];\n";
+    if (hasState(Q_ACCEPT) && hasState(Q_SYN_RECEIVED))
+        ss << "    p_s" << Q_ACCEPT << " -> p_s" << Q_SYN_RECEIVED << " [label=\"SYN (new)\"];\n";
+
+    ss << "  }\n";
+    return ss.str();
 }
 
 } // namespace CS311

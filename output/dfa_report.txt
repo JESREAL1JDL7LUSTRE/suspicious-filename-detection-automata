@@ -1,0 +1,21 @@
+╔═══════════════════════════════════════════════════════════╗
+║          DFA MODULE - DETECTION RESULTS                   ║
+╚═══════════════════════════════════════════════════════════╝
+
+[DETECTION METRICS]
+  ✓ True Positives:   302
+  ✗ False Positives:  0
+  ✗ False Negatives:  39
+  Detection Rate:     88.563%
+
+[STATE REDUCTION]
+  Original DFA states:    41
+  After Minimization:     29 (-29.2683%)
+  After IGA:              21 (-27.5862%)
+  Total Reduction:        48.7805%
+
+[PERFORMANCE]
+  Patterns:               5
+  Files tested:           341
+  Total execution time:   0.663 ms
+  Average per file:       0.00194428 ms

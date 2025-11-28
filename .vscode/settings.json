@@ -6,6 +6,11 @@
         "stdexcept": "cpp",
         "cctype": "cpp",
         "algorithm": "cpp",
-        "ostream": "cpp"
+        "ostream": "cpp",
+        "filesystem": "cpp",
+        "fstream": "cpp",
+        "map": "cpp",
+        "sstream": "cpp",
+        "string": "cpp"
     }
 }
