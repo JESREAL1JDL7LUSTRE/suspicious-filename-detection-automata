@@ -48,8 +48,13 @@ public:
     void applyIGA();
     void testPatterns();
     void generateReport();
+    // Export Graphviz DOT for the built DFAs (after convertToDFAs / applyIGA)
+    std::string exportGraphvizAll() const;
+    // Export single DFA cluster by index (useful to write separate files)
+    std::string exportGraphvizFor(size_t index) const;
     
     // Getters
+    size_t getDfaCount() const;
     const DFAMetrics& getMetrics() const { return metrics; }
 };
 

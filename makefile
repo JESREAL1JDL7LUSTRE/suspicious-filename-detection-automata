@@ -11,7 +11,8 @@ SOURCES = \
 	$(SRCDIR)/regexparser/RegexParser.cpp \
 	$(SRCDIR)/pda/PDAModule.cpp \
 	$(SRCDIR)/dfa/DFAModule.cpp \
-	$(SRCDIR)/jsonparser/JSONParser.cpp
+	$(SRCDIR)/jsonparser/JSONParser.cpp \
+	$(SRCDIR)/AutomataJSON.cpp
 # Map each source file `src/.../file.cpp` to `obj/.../file.o`
 OBJECTS = $(patsubst $(SRCDIR)/%.cpp,$(OBJDIR)/%.o,$(SOURCES))
 

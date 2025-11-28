@@ -151,6 +151,23 @@ inline void printHeader(const std::string& title) {
     std::cout << std::endl;
 }
 
+// Escape a string for safe inclusion inside DOT label="..." fields.
+// Replaces backslash with "\\" and double-quote with "\"" so Graphviz parses correctly.
+inline std::string escapeDotLabel(const std::string& s) {
+    std::string out;
+    out.reserve(s.size());
+    for (char c : s) {
+        if (c == '\\') {
+            out += "\\\\"; // becomes two backslashes in DOT source
+        } else if (c == '"') {
+            out += "\\\""; // escaped double-quote
+        } else {
+            out.push_back(c);
+        }
+    }
+    return out;
+}
+
 } // namespace CS311
 
 #endif // UTILS_H
