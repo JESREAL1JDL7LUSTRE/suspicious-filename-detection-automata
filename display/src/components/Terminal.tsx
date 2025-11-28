@@ -143,7 +143,7 @@ export function Terminal({ output, isRunning }: TerminalProps) {
   }, [displayedOutput])
 
   return (
-    <div className="custom-scroll-bar min-h-screen max-h-screen flex flex-col bg-gray-900 text-green-400 font-mono text-sm rounded border border-gray-700">
+    <div className="custom-scroll-bar min-h-screen max-h-screen flex flex-col bg-gray-900 text-green-400 font-mono text-sm rounded-lg border border-gray-700">
       <div className="px-4 py-2 bg-gray-800 border-b border-gray-700 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-red-500"></div>
