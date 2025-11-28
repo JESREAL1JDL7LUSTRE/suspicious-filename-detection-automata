@@ -10,6 +10,7 @@ $OBJDIR = "obj"
 # Source files
 $SOURCES = @(
     "$SRCDIR/main.cpp",
+    "$SRCDIR/AutomataJSON.cpp",
     "$SRCDIR/regexparser/RegexParser.cpp",
     "$SRCDIR/pda/PDAModule.cpp",
     "$SRCDIR/dfa/DFAModule.cpp",

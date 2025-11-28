@@ -28,6 +28,10 @@ echo   Compiling src\main.cpp...
 %CXX% %CXXFLAGS% -c src\main.cpp -o obj\main.o
 if errorlevel 1 goto :error
 
+echo   Compiling src\AutomataJSON.cpp...
+%CXX% %CXXFLAGS% -c src\AutomataJSON.cpp -o obj\AutomataJSON.o
+if errorlevel 1 goto :error
+
 echo   Compiling src\regexparser\RegexParser.cpp...
 %CXX% %CXXFLAGS% -c src\regexparser\RegexParser.cpp -o obj\regexparser\RegexParser.o
 if errorlevel 1 goto :error
@@ -46,7 +50,7 @@ if errorlevel 1 goto :error
 
 REM Link object files
 echo   Linking %TARGET%...
-%CXX% obj\main.o obj\regexparser\RegexParser.o obj\pda\PDAModule.o obj\dfa\DFAModule.o obj\jsonparser\JSONParser.o -o %TARGET%
+%CXX% obj\main.o obj\AutomataJSON.o obj\regexparser\RegexParser.o obj\pda\PDAModule.o obj\dfa\DFAModule.o obj\jsonparser\JSONParser.o -o %TARGET%
 if errorlevel 1 goto :error
 
 echo Build complete! Run with: %TARGET%
