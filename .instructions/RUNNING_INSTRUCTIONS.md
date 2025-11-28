@@ -17,15 +17,17 @@ This guide explains how to build and run the CS311 Chomsky Hierarchy Security Si
 
 ### Option 1: Using Build Scripts (Recommended for Windows)
 
+> **⚠️ WARNING**: If `simulator.exe` is currently running, the build will fail because the file is locked. Close the program before rebuilding.
+
 #### PowerShell (Windows):
 ```powershell
-.\build.ps1
+.\.scripts\build.ps1
 .\simulator.exe
 ```
 
 #### Command Prompt (Windows):
 ```cmd
-build.bat
+.scripts\build.bat
 simulator.exe
 ```
 
@@ -68,9 +70,10 @@ suspicious-filename-detection-automata/
 │   └── tcp_handshake_traces_expanded.jsonl
 ├── obj/                   # Compiled object files (generated)
 ├── output/                # Output reports (generated at runtime)
+├── .scripts/              # Build scripts
+│   ├── build.ps1         # PowerShell build script (Windows)
+│   └── build.bat         # Batch build script (Windows)
 ├── makefile              # Build configuration (for make)
-├── build.ps1             # PowerShell build script (Windows)
-├── build.bat             # Batch build script (Windows)
 └── simulator.exe         # Compiled executable (generated)
 ```
 
@@ -101,13 +104,14 @@ The simulator demonstrates the Chomsky Hierarchy through two security-focused mo
 - Ensure the compiler is in your system PATH
 
 ### "make: command not found"
-- Install `make` or use the build scripts (`build.ps1` or `build.bat`) instead
+- Install `make` or use the build scripts (`.scripts/build.ps1` or `.scripts/build.bat`) instead
 - On Windows, you can use the PowerShell script without `make`
 
 ### "Permission denied" (Linux/Mac)
 - Make the executable runnable: `chmod +x simulator` or `chmod +x simulator.exe`
 
 ### Build errors
+- **"Permission denied" or "Access is denied" when building**: The `simulator.exe` file may be locked because it's currently running. Close the program and try building again.
 - Ensure all source files are present in the `src/` directory
 - Check that the data files exist in the `archive/` directory
 - Verify compiler supports C++17 standard
@@ -119,7 +123,7 @@ The simulator demonstrates the Chomsky Hierarchy through two security-focused mo
 ## Platform-Specific Notes
 
 ### Windows
-- Use `build.ps1` (PowerShell) or `build.bat` (CMD)
+- Use `.scripts/build.ps1` (PowerShell) or `.scripts/build.bat` (CMD)
 - Executable will be `simulator.exe`
 - If PowerShell execution is blocked, run: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
 
