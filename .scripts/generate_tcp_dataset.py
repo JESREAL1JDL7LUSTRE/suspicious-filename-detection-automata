@@ -1,4 +1,5 @@
 import json
+import os
 
 # Expanded TCP Handshake Dataset Generator
 # Creates 75 traces with realistic variations
@@ -308,7 +309,14 @@ tcp_traces.append({
 trace_counter += 1
 
 # Write to JSONL file
-output_file = "tcp_handshake_traces_expanded.jsonl"
+# Output to archive/ directory (works from project root or .scripts/ directory)
+script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(script_dir)  # Go up one level from .scripts/
+archive_dir = os.path.join(project_root, "archive")
+output_file = os.path.join(archive_dir, "tcp_handshake_traces_expanded.jsonl")
+
+# Ensure archive directory exists
+os.makedirs(archive_dir, exist_ok=True)
 with open(output_file, 'w', encoding='utf-8') as f:
     for trace in tcp_traces:
         f.write(json.dumps(trace) + '\n')
@@ -323,4 +331,4 @@ for trace in tcp_traces:
     categories[cat] = categories.get(cat, 0) + 1
 for cat, count in sorted(categories.items()):
     print(f"   - {cat}: {count}")
-print(f"\n[INFO] Save this file to: D:\\SCHOOL\\Automata\\finalProject\\archive\\")
+print(f"\n[INFO] File saved to: archive/tcp_handshake_traces_expanded.jsonl")

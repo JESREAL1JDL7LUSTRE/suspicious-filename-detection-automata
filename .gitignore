@@ -1,0 +1,56 @@
+# Compiled binaries
+simulator.exe
+simulator
+*.exe
+*.out
+*.app
+
+# Object files
+obj/
+*.o
+*.obj
+
+# Build artifacts
+*.a
+*.lib
+*.so
+*.dll
+*.dylib
+
+# Output directory (generated at runtime)
+output/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.tmp
+*~
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# CMake (if you add it later)
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Compiled source files
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+

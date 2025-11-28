@@ -44,6 +44,8 @@ public:
     void testAllTraces();      // Test all traces
     void showStackOperations(const std::vector<std::string>& sequence);
     void generateReport();
+    // Export Graphviz DOT representing the PDA structure
+    std::string exportGraphviz() const;
     
     // Getters
     const PDAMetrics& getMetrics() const { return metrics; }
