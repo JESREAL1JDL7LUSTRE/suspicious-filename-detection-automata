@@ -70,9 +70,10 @@ suspicious-filename-detection-automata/
 │   └── tcp_handshake_traces_expanded.jsonl
 ├── obj/                   # Compiled object files (generated)
 ├── output/                # Output reports (generated at runtime)
-├── .scripts/              # Build scripts
+├── .scripts/              # Scripts and utilities
 │   ├── build.ps1         # PowerShell build script (Windows)
-│   └── build.bat         # Batch build script (Windows)
+│   ├── build.bat         # Batch build script (Windows)
+│   └── generate_tcp_dataset.py  # Python script for generating TCP dataset
 ├── makefile              # Build configuration (for make)
 └── simulator.exe         # Compiled executable (generated)
 ```
