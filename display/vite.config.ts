@@ -11,6 +11,12 @@ export default defineConfig({
       // Allow serving files from the project root (to read output graphs)
       // Allow access to parent directory (project root) and output folder
       allow: ['..']
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      }
     }
   },
   resolve: {
