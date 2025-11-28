@@ -1,27 +1,31 @@
 /**
- * File: JSONParser.h
- * Purpose: Parse JSONL datasets for filenames and TCP traces (simple parser)
+ * JSONParser.h
+ * Simple JSONL parser for loading datasets
  */
 
 #ifndef JSONPARSER_H
 #define JSONPARSER_H
 
 #include "Utils.h"
+#include <string>
+#include <vector>
 #include <fstream>
-#include <iostream>
-#include <sstream>
 
 namespace CS311 {
 
 class JSONParser {
-public:
-    static std::vector<FilenameEntry> loadFilenameDataset(const std::string& filepath);
-    static std::vector<TCPTrace> loadTCPDataset(const std::string& filepath);
 private:
+    // Helper to extract string value from JSON
+    static std::string extractString(const std::string& src, const std::string& key);
+    
+    // Parse individual entries
     static FilenameEntry parseFilenameEntrySimple(const std::string& line);
     static TCPTrace parseTCPTraceSimple(const std::string& line);
-    // helper
-    static std::string extractString(const std::string& src, const std::string& key);
+
+public:
+    // Load datasets from JSONL files
+    static std::vector<FilenameEntry> loadFilenameDataset(const std::string& filepath);
+    static std::vector<TCPTrace> loadTCPDataset(const std::string& filepath);
 };
 
 } // namespace CS311
