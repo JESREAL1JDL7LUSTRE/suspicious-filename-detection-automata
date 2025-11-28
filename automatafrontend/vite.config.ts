@@ -9,12 +9,20 @@ export default defineConfig({
   server: {
     fs: {
       // Allow serving files from the project root (to read output graphs)
-      allow: ['..', 'D:/SCHOOL/Automata/finalProject']
+      // Allow access to parent directory (project root) and output folder
+      allow: ['..']
     }
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')
     }
+  },
+  define: {
+    // Inject the absolute path to the output directory
+    // This allows the frontend to access files from the C++ backend
+    'import.meta.env.VITE_OUTPUT_DIR': JSON.stringify(
+      path.resolve(__dirname, '..', 'output').replace(/\\/g, '/')
+    )
   }
 })
