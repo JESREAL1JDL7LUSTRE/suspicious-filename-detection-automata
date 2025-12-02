@@ -71,8 +71,11 @@ void PDAModule::buildPDA() {
     std::cout << "\n[STACK OPERATIONS]" << std::endl;
     std::cout << "  PUSH SYN:      On receiving SYN in q0" << std::endl;
     std::cout << "  PUSH SYN-ACK:  On receiving SYN-ACK in q1" << std::endl;
-    std::cout << "  POP ALL:       On receiving ACK in q2" << std::endl;
-    std::cout << "  Stack empty:   Required for acceptance" << std::endl;
+    std::cout << "  POP ALL:       On receiving ACK in q2 (pops both SYN-ACK and SYN)" << std::endl;
+    std::cout << "  Stack empty:   Required for acceptance (state-based + empty stack)" << std::endl;
+    std::cout << "\n[NOTE] Both SYN and SYN-ACK are pushed to visualize stack depth" << std::endl;
+    std::cout << "  for pedagogical purposes. In production, only SYN might be pushed," << std::endl;
+    std::cout << "  with transitions checking SYN-ACK before popping on ACK." << std::endl;
     
     std::cout << "\n[SUCCESS] PDA constructed from CFG" << std::endl;
     std::cout << std::endl;
@@ -213,7 +216,7 @@ void PDAModule::testAllTraces() {
     
     // Show failed traces if any
     if (!failed_traces.empty() && failed_traces.size() <= 10) {
-        std::cout << "\n[DEBUG] Sample failed traces:" << std::endl;
+        std::cout << "\n[Failed (false positives/negatives)] Sample failed traces:" << std::endl;
         for (size_t i = 0; i < std::min((size_t)5, failed_traces.size()); i++) {
             std::cout << "  " << failed_traces[i] << std::endl;
         }
@@ -262,6 +265,26 @@ void PDAModule::generateReport() {
     std::cout << "║          PDA MODULE - VALIDATION RESULTS                  ║" << std::endl;
     std::cout << "╚═══════════════════════════════════════════════════════════╝" << std::endl;
     
+    // Show sample TCP trace results
+    std::cout << "\n[SAMPLE TCP TRACE RESULTS (RANDOMIZED)]" << std::endl;
+    int sample_count = 0;
+    for (const auto& t : dataset) {
+        if (sample_count >= 5) break;
+        pda.reset();  // Reset PDA state before validation
+        bool result = validateSequence(t.sequence);
+        std::string validation = result ? "VALID" : "INVALID";
+        std::string reason = "";
+        if (!result && t.valid) {
+            reason = " (unexpected rejection)";
+        } else if (result && !t.valid) {
+            reason = " (unexpected acceptance)";
+        } else if (!result && !t.valid && !t.description.empty()) {
+            reason = " (" + t.description + ")";
+        }
+        std::cout << t.trace_id << ": " << validation << reason << std::endl;
+        sample_count++;
+    }
+    
     std::cout << "\n[VALIDATION METRICS]" << std::endl;
     std::cout << "  ✓ Valid accepted:       " << metrics.correctly_accepted 
              << " / " << metrics.valid_traces << std::endl;
@@ -275,16 +298,46 @@ void PDAModule::generateReport() {
     std::cout << "  Average stack depth:    " << metrics.avg_stack_depth << std::endl;
     std::cout << "  Maximum stack depth:    " << metrics.max_stack_depth << std::endl;
     
+    // Calculate confusion matrix for PDA
+    int true_negatives = metrics.correctly_rejected;
+    double precision = (metrics.correctly_accepted + metrics.false_positives > 0)
+        ? (100.0 * metrics.correctly_accepted / (metrics.correctly_accepted + metrics.false_positives)) : 0.0;
+    double recall = (metrics.correctly_accepted + metrics.false_negatives > 0)
+        ? (100.0 * metrics.correctly_accepted / (metrics.correctly_accepted + metrics.false_negatives)) : 0.0;
+    double f1_score = (precision + recall > 0) ? (2.0 * precision * recall / (precision + recall)) : 0.0;
+    
+    std::cout << "\n[CONFUSION MATRIX DEFINITIONS]" << std::endl;
+    std::cout << "  TP (True Positive):  Valid trace correctly accepted" << std::endl;
+    std::cout << "  FP (False Positive): Invalid trace incorrectly accepted" << std::endl;
+    std::cout << "  TN (True Negative):  Invalid trace correctly rejected" << std::endl;
+    std::cout << "  FN (False Negative): Valid trace incorrectly rejected" << std::endl;
+    
+    std::cout << "\n[CONFUSION MATRIX]" << std::endl;
+    std::cout << "  ✓ True Positives (TP):   " << metrics.correctly_accepted << std::endl;
+    std::cout << "  ✗ False Positives (FP):  " << metrics.false_positives << std::endl;
+    std::cout << "  ✓ True Negatives (TN):   " << true_negatives << std::endl;
+    std::cout << "  ✗ False Negatives (FN):  " << metrics.false_negatives << std::endl;
+    std::cout << "  Precision:               " << precision << "%" << std::endl;
+    std::cout << "  Recall:                  " << recall << "%" << std::endl;
+    std::cout << "  F1 Score:                " << f1_score << "%" << std::endl;
+    
     std::cout << "\n[PERFORMANCE]" << std::endl;
     std::cout << "  Total traces:           " << metrics.total_traces << std::endl;
-    std::cout << "  Total execution time:   " << metrics.total_execution_time_ms << " ms" << std::endl;
+    std::cout << "  Total execution time:   " << metrics.total_execution_time_ms << " ms (wall-clock)" << std::endl;
     std::cout << "  Average per trace:      " << metrics.avg_validation_time_ms << " ms" << std::endl;
+    std::cout << "  Note: Times measured using std::chrono::high_resolution_clock" << std::endl;
+    
+    std::cout << "\n[TEST DATASET LABELS]" << std::endl;
+    std::cout << "  Ground truth derived from: archive/tcp_handshake_traces_expanded.jsonl" << std::endl;
+    std::cout << "  Labels: 'valid' field indicates ground truth (true=valid handshake, false=invalid)" << std::endl;
+    std::cout << "  Dataset contains valid TCP handshake sequences and invalid/malformed sequences" << std::endl;
     
     std::cout << "\n[CONTEXT-FREE PROPERTY]" << std::endl;
     std::cout << "  Stack usage demonstrates Type-2 (CF) language:" << std::endl;
     std::cout << "  • Stack needed to track SYN ↔ SYN-ACK ↔ ACK pairing" << std::endl;
     std::cout << "  • Cannot be recognized by finite automaton (DFA)" << std::endl;
     std::cout << "  • Requires unbounded memory for nested structures" << std::endl;
+    std::cout << "  • Accepting condition: State-based (q3) AND empty stack" << std::endl;
     std::cout << std::endl;
 
     // Also write PDA report to output file
@@ -303,9 +356,29 @@ void PDAModule::generateReport() {
             out << "\n[STACK METRICS]\n";
             out << "  Average stack depth:    " << metrics.avg_stack_depth << "\n";
             out << "  Maximum stack depth:    " << metrics.max_stack_depth << "\n";
+            int true_negatives = metrics.correctly_rejected;
+            double precision = (metrics.correctly_accepted + metrics.false_positives > 0)
+                ? (100.0 * metrics.correctly_accepted / (metrics.correctly_accepted + metrics.false_positives)) : 0.0;
+            double recall = (metrics.correctly_accepted + metrics.false_negatives > 0)
+                ? (100.0 * metrics.correctly_accepted / (metrics.correctly_accepted + metrics.false_negatives)) : 0.0;
+            double f1_score = (precision + recall > 0) ? (2.0 * precision * recall / (precision + recall)) : 0.0;
+            
+            out << "\n[CONFUSION MATRIX DEFINITIONS]\n";
+            out << "  TP (True Positive):  Valid trace correctly accepted\n";
+            out << "  FP (False Positive): Invalid trace incorrectly accepted\n";
+            out << "  TN (True Negative):  Invalid trace correctly rejected\n";
+            out << "  FN (False Negative): Valid trace incorrectly rejected\n";
+            out << "\n[CONFUSION MATRIX]\n";
+            out << "  ✓ True Positives (TP):   " << metrics.correctly_accepted << "\n";
+            out << "  ✗ False Positives (FP):  " << metrics.false_positives << "\n";
+            out << "  ✓ True Negatives (TN):   " << true_negatives << "\n";
+            out << "  ✗ False Negatives (FN):  " << metrics.false_negatives << "\n";
+            out << "  Precision:               " << precision << "%\n";
+            out << "  Recall:                  " << recall << "%\n";
+            out << "  F1 Score:                " << f1_score << "%\n";
             out << "\n[PERFORMANCE]\n";
             out << "  Total traces:           " << metrics.total_traces << "\n";
-            out << "  Total execution time:   " << metrics.total_execution_time_ms << " ms\n";
+            out << "  Total execution time:   " << metrics.total_execution_time_ms << " ms (wall-clock)\n";
             out << "  Average per trace:      " << metrics.avg_validation_time_ms << " ms\n";
             out.close();
         }

@@ -4,6 +4,7 @@ import { Terminal } from './components/Terminal'
 import { Header } from './components/Header'
 import { GraphVisualization } from './components/GraphVisualization'
 import { FileUpload } from './components/FileUpload'
+import { FileProcessingIndicator } from './components/FileProcessingIndicator'
 import { useSimulator } from './hooks/useSimulator'
 import { useGraphLoader } from './hooks/useGraphLoader'
 import { useFileScan } from './hooks/useFileScan'
@@ -83,7 +84,7 @@ function App() {
       <main className="flex-1 flex gap-4 p-4 overflow-hidden min-h-0">
         {/* Terminal on the left */}
         <div className="w-1/3 min-w-[550px] shrink-0 flex flex-col min-h-0">
-          <Terminal output={terminalOutput} isRunning={isRunning} />
+          <Terminal output={terminalOutput} isRunning={isRunning} scanMode={mode === 'scan'} />
         </div>
 
           {/* Graph visualization */}
@@ -96,11 +97,12 @@ function App() {
               isRunning={isRunning}
               scanResults={fileScan.scanResults}
               isScanMode={mode === 'scan' && fileScan.scanResults.length > 0}
+              totalFiles={selectedFiles.length}
             />
           </div>
           
           {/* File Upload Section */}
-          <div className="flex-1">
+          <div className="flex-1 flex flex-col">
             <FileUpload
               onFilesSelected={handleFilesSelected}
               onFolderSelected={handleFilesSelected}
@@ -124,6 +126,16 @@ function App() {
                   Files will be scanned for suspicious patterns. Click "Run Simulator" to use default dataset instead.
                 </p>
               </div>
+            )}
+            
+            {/* File Processing Indicator - shown at bottom during scanning */}
+            {mode === 'scan' && isRunning && (
+              <FileProcessingIndicator
+                scanResults={fileScan.scanResults}
+                isScanning={isRunning}
+                totalFiles={selectedFiles.length}
+                terminalOutput={fileScan.terminalOutput}
+              />
             )}
           </div>
       </main>
