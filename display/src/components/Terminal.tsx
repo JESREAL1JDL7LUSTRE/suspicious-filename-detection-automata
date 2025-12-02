@@ -150,50 +150,6 @@ function getColorClass(parsed: ParsedLine): string {
   }
 }
 
-interface TypingLineProps {
-  text: string
-  delay: number
-  onComplete?: () => void
-}
-
-function TypingLine({ text, delay, onComplete }: TypingLineProps) {
-  const [displayedText, setDisplayedText] = useState('')
-  const currentIndexRef = useRef(0)
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    // Reset when text changes
-    setDisplayedText('')
-    currentIndexRef.current = 0
-    
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
-    }
-
-    const typeNextChar = () => {
-      if (currentIndexRef.current < text.length) {
-        setDisplayedText(text.substring(0, currentIndexRef.current + 1))
-        currentIndexRef.current++
-        timeoutRef.current = setTimeout(typeNextChar, delay)
-      } else if (onComplete) {
-        onComplete()
-      }
-    }
-    
-    if (text.length > 0) {
-      timeoutRef.current = setTimeout(typeNextChar, delay)
-    }
-    
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
-    }
-  }, [text, delay, onComplete])
-
-  return <span>{displayedText}</span>
-}
-
 export function Terminal({ output, isRunning, scanMode = false }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
