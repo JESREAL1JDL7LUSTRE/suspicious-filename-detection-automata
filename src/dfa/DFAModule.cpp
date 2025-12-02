@@ -457,6 +457,12 @@ void DFAModule::generateReport() {
     std::cout << "  Labels: 'is_malicious' field indicates ground truth (true=malicious, false=benign)" << std::endl;
     std::cout << "  Dataset contains known malicious filename patterns and benign examples" << std::endl;
     
+    std::cout << "\n[IGA PATTERN → GROUP MAPPING]" << std::endl;
+    for (size_t i = 0; i < pattern_names.size() && i < grouped_dfas.size(); ++i) {
+        std::cout << "  Group " << i << ": Pattern '" << regex_patterns[i] 
+                  << "' (" << pattern_names[i] << ") → DFA " << i << std::endl;
+    }
+    
     std::cout << "\n[EDGE-CASE BEHAVIOR]" << std::endl;
     std::cout << "  Unsupported regex features (backreferences): Not supported, will fail during NFA construction" << std::endl;
     std::cout << "  Whitelist patterns: Not implemented; all matches are treated as suspicious" << std::endl;
@@ -503,6 +509,11 @@ void DFAModule::generateReport() {
             out << "  After IGA:              " << metrics.total_dfa_states_after_iga << " (-" << metrics.state_reduction_iga_percent << "% vs minimized, -" 
                 << metrics.total_reduction_percent << "% vs original)\n";
             out << "  Total Reduction:        " << metrics.total_reduction_percent << "% (vs original)\n";
+            out << "\n[IGA PATTERN → GROUP MAPPING]\n";
+            for (size_t i = 0; i < pattern_names.size() && i < grouped_dfas.size(); ++i) {
+                out << "  Group " << i << ": Pattern '" << regex_patterns[i] 
+                    << "' (" << pattern_names[i] << ") → DFA " << i << "\n";
+            }
             out << "\n[RESOURCE METRICS]\n";
             out << "  Estimated DFA memory:   " << metrics.estimated_memory_kb << " KB\n";
             out << "\n[PERFORMANCE]\n";
