@@ -93,19 +93,121 @@ export function useFileScan(onComplete?: (results: ScanResult[]) => void) {
                 try {
                   const data = JSON.parse(line.substring(6))
                   
-                  if (data.type === 'start' || data.type === 'scan_progress' || data.type === 'scan_summary') {
+                  // Handle C++ simulator output (stdout/stderr)
+                  if (data.type === 'stdout' || data.type === 'stderr') {
+                    const message = data.message || ''
+                    setTerminalOutput((prev) => [...prev, message])
+                    
+                    // Parse C++ output to extract scan results
+                    // Look for lines like: "[1/32] Analyzing: filename" and "✓ Result: SUSPICIOUS/SAFE"
+                    const analyzingMatch = message.match(/\[(\d+)\/(\d+)\]\s*Analyzing:\s*([^\n\r]+)/i)
+                    if (analyzingMatch) {
+                      const fileName = analyzingMatch[3].trim()
+                      // Extract filename from path if needed
+                      const cleanFileName = fileName.split(/[/\\]/).pop() || fileName
+                      
+                      // Check if we already have this result
+                      const existingIndex = results.findIndex(r => r.file === cleanFileName)
+                      if (existingIndex === -1) {
+                        // Create a placeholder result (will be updated when we see the result)
+                        const newResult: ScanResult = {
+                          file: cleanFileName,
+                          path: fileName,
+                          status: 'safe', // Will be updated
+                          severity: 'safe',
+                          pattern: null,
+                          color: 'blue'
+                        }
+                        results.push(newResult)
+                        setScanResults((prev) => [...prev, newResult])
+                      }
+                    }
+                    
+                    // Look for result lines: "✓ Result: SUSPICIOUS (pattern)" or "✓ Result: SAFE"
+                    // These come right after the analyzing line, so match to the most recent unupdated result
+                    const resultMatch = message.match(/✓\s*Result:\s*(SUSPICIOUS|SAFE)(?:\s*\(([^)]+)\))?/i)
+                    if (resultMatch) {
+                      const status = resultMatch[1].toLowerCase() === 'suspicious' ? 'suspicious' : 'safe'
+                      const pattern = resultMatch[2] || null
+                      
+                      // Find the most recent result that hasn't been fully updated
+                      // Look for the last result that is still a placeholder (has default values)
+                      let updated = false
+                      for (let i = results.length - 1; i >= 0; i--) {
+                        // Check if this result is still a placeholder
+                        // A placeholder has: status='safe', pattern=null, severity='safe'
+                        const isPlaceholder = results[i].status === 'safe' && 
+                                             results[i].pattern === null && 
+                                             results[i].severity === 'safe'
+                        
+                        if (isPlaceholder) {
+                          // Update this result with the actual status
+                          const updatedResult: ScanResult = {
+                            ...results[i],
+                            status: status,
+                            severity: status === 'suspicious' 
+                              ? (pattern === 'executable' || pattern === 'screensaver' ? 'high' : 
+                                 pattern === 'batch_file' || pattern === 'vbscript' ? 'medium' : 'low')
+                              : 'safe',
+                            pattern: pattern,
+                            color: status === 'suspicious'
+                              ? (pattern === 'executable' || pattern === 'screensaver' ? 'red' : 
+                                 pattern === 'batch_file' || pattern === 'vbscript' ? 'yellow' : 'orange')
+                              : 'blue'
+                          }
+                          results[i] = updatedResult
+                          setScanResults((prev) => {
+                            const newResults = [...prev]
+                            newResults[i] = updatedResult
+                            return newResults
+                          })
+                          updated = true
+                          break
+                        }
+                      }
+                      
+                      // If no placeholder found but we have a result, create a new one
+                      // This handles cases where the result comes before the analyzing line
+                      if (!updated && resultMatch) {
+                        const newResult: ScanResult = {
+                          file: `file_${results.length + 1}`, // Fallback name
+                          path: '',
+                          status: status,
+                          severity: status === 'suspicious' 
+                            ? (pattern === 'executable' || pattern === 'screensaver' ? 'high' : 
+                               pattern === 'batch_file' || pattern === 'vbscript' ? 'medium' : 'low')
+                            : 'safe',
+                          pattern: pattern,
+                          color: status === 'suspicious'
+                            ? (pattern === 'executable' || pattern === 'screensaver' ? 'red' : 
+                               pattern === 'batch_file' || pattern === 'vbscript' ? 'yellow' : 'orange')
+                            : 'blue'
+                        }
+                        results.push(newResult)
+                        setScanResults((prev) => [...prev, newResult])
+                      }
+                    }
+                    // Also parse the final summary line: "✓ Safe files: X" and "✗ Suspicious files: Y"
+                    const safeCountMatch = message.match(/✓\s*Safe files:\s*(\d+)/i)
+                    const suspiciousCountMatch = message.match(/✗\s*Suspicious files:\s*(\d+)/i)
+                    
+                    if (safeCountMatch || suspiciousCountMatch) {
+                      // Summary found - ensure all results are properly set
+                      // Results should already be parsed from individual file results above
+                      // Just ensure the final state is correct
+                      setScanResults((prev) => [...prev]) // Trigger re-render with current results
+                    }
+                  } 
+                  // Handle legacy scan types (for backward compatibility)
+                  else if (data.type === 'start' || data.type === 'scan_progress' || data.type === 'scan_summary') {
                     setTerminalOutput((prev) => [...prev, data.message])
-                  } else                   if (data.type === 'scan_result') {
+                  } else if (data.type === 'scan_result') {
                     setTerminalOutput((prev) => [...prev, data.message])
                     if (data.result) {
                       results.push(data.result)
                       // Update scan results progressively (one by one)
                       setScanResults((prev) => [...prev, data.result])
                     }
-                  } else if (data.type === 'scan_progress') {
-                    setTerminalOutput((prev) => [...prev, data.message])
-                  } else if (data.type === 'scan_summary') {
-                    setTerminalOutput((prev) => [...prev, data.message])
                   } else if (data.type === 'end') {
                     setTerminalOutput((prev) => [...prev, data.message])
                     setIsScanning(false)
@@ -113,6 +215,12 @@ export function useFileScan(onComplete?: (results: ScanResult[]) => void) {
                       setScanResults(data.results)
                       if (onComplete) {
                         onComplete(data.results)
+                      }
+                    } else if (results.length > 0) {
+                      // Use parsed results if available - ensure all are properly set
+                      setScanResults(results)
+                      if (onComplete) {
+                        onComplete(results)
                       }
                     }
                     return

@@ -207,7 +207,7 @@ app.post('/api/run-simulator', async (req, res) => {
 })
 
 // Health check endpoint
-// Scan endpoint - processes files/folders for suspicious patterns
+// Scan endpoint - uses C++ DFA modules for scanning
 app.post('/api/scan', async (req, res) => {
   console.log('Received scan request')
   
@@ -215,6 +215,7 @@ app.post('/api/scan', async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache')
   res.setHeader('Connection', 'keep-alive')
   res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('X-Accel-Buffering', 'no')
   
   const { files: filePaths } = req.body
   
@@ -224,186 +225,131 @@ app.post('/api/scan', async (req, res) => {
     return
   }
   
-  res.write(`data: ${JSON.stringify({ type: 'start', message: '╔═══════════════════════════════════════════════════════════╗\n' })}\n\n`)
-  res.write(`data: ${JSON.stringify({ type: 'start', message: '║   FILE SCAN MODULE - SUSPICIOUS FILENAME DETECTION        ║\n' })}\n\n`)
-  res.write(`data: ${JSON.stringify({ type: 'start', message: '╚═══════════════════════════════════════════════════════════╝\n\n' })}\n\n`)
+  // Send initial connection message
+  res.write(`data: ${JSON.stringify({ type: 'start', message: 'Starting C++ DFA scanner...\n' })}\n\n`)
   
-  res.write(`data: ${JSON.stringify({ type: 'start', message: '[INFO] Initializing scan module...\n' })}\n\n`)
-  res.write(`data: ${JSON.stringify({ type: 'start', message: `[INFO] Total files to scan: ${filePaths.length}\n` })}\n\n`)
+  if (res.flushHeaders) {
+    res.flushHeaders()
+  }
   
-  // DFA patterns (same as C++ code)
-  const patterns = [
-    { regex: /\.exe$/i, name: 'executable', severity: 'high', description: 'Executable file' },
-    { regex: /\.scr$/i, name: 'screensaver', severity: 'high', description: 'Screensaver file' },
-    { regex: /\.bat$/i, name: 'batch_file', severity: 'medium', description: 'Batch script' },
-    { regex: /\.vbs$/i, name: 'vbscript', severity: 'medium', description: 'VBScript file' },
-    { regex: /update/i, name: 'mimic_legitimate', severity: 'low', description: 'Mimics legitimate update file' }
-  ]
-  
-  res.write(`data: ${JSON.stringify({ type: 'start', message: '[INFO] Loaded detection patterns:\n' })}\n\n`)
-  patterns.forEach((p, idx) => {
-    res.write(`data: ${JSON.stringify({ type: 'start', message: `  Pattern ${idx + 1}: ${p.name} (${p.severity} risk) - ${p.description}\n` })}\n\n`)
-  })
-  res.write(`data: ${JSON.stringify({ type: 'start', message: '\n' })}\n\n`)
-  
-  const scanResults = []
-  let suspiciousCount = 0
-  let safeCount = 0
+  // Keepalive interval
+  const keepAliveInterval = setInterval(() => {
+    try {
+      res.write(`: keepalive\n\n`)
+    } catch (e) {
+      clearInterval(keepAliveInterval)
+    }
+  }, 30000)
   
   try {
-    for (let i = 0; i < filePaths.length; i++) {
-      const filePath = filePaths[i]
-      const fileName = filePath.split(/[/\\]/).pop() || filePath
-      
-      res.write(`data: ${JSON.stringify({ 
-        type: 'scan_progress', 
-        message: `\n[${i + 1}/${filePaths.length}] Analyzing: ${fileName}\n`,
-        file: fileName,
-        index: i,
-        total: filePaths.length
-      })}\n\n`)
-      
-      res.write(`data: ${JSON.stringify({ 
-        type: 'scan_progress', 
-        message: `  → Extracting filename: ${fileName}\n`,
-      })}\n\n`)
-      
-      let detected = false
-      let matchedPattern = null
-      const checks = []
-      
-      // Check against patterns
-      for (const pattern of patterns) {
-        const matches = pattern.regex.test(fileName)
-        checks.push({ pattern: pattern.name, matches })
-        if (matches && !detected) {
-          detected = true
-          matchedPattern = pattern
-          res.write(`data: ${JSON.stringify({ 
-            type: 'scan_progress', 
-            message: `  → Pattern match: ${pattern.name} (${pattern.severity} risk)\n`,
-          })}\n\n`)
-        }
+    // Prepare file paths as command-line arguments
+    // Escape paths with spaces for Windows
+    const args = filePaths.map(path => {
+      if (path.includes(' ')) {
+        return `"${path}"`
       }
-      
-      // Check for double extensions
-      const dotCount = (fileName.match(/\./g) || []).length
-      if (dotCount >= 2 && !detected) {
-        detected = true
-        matchedPattern = { name: 'double_extension', severity: 'medium', description: 'Double extension detected' }
-        res.write(`data: ${JSON.stringify({ 
-          type: 'scan_progress', 
-          message: `  → Double extension detected (${dotCount} dots)\n`,
-        })}\n\n`)
-      }
-      
-      // Check for unicode tricks
-      const hasUnicode = /[^\x00-\x7F]/.test(fileName)
-      if (hasUnicode && !detected) {
-        detected = true
-        matchedPattern = { name: 'unicode_trick', severity: 'medium', description: 'Unicode characters detected' }
-        res.write(`data: ${JSON.stringify({ 
-          type: 'scan_progress', 
-          message: `  → Unicode characters detected\n`,
-        })}\n\n`)
-      }
-      
-      const status = detected ? 'suspicious' : 'safe'
-      const severity = detected ? matchedPattern.severity : 'safe'
-      
-      if (status === 'suspicious') {
-        suspiciousCount++
-      } else {
-        safeCount++
-      }
-      
-      scanResults.push({
-        file: fileName,
-        path: filePath,
-        status,
-        severity,
-        pattern: matchedPattern?.name || null
+      return path
+    })
+    
+    console.log(`Spawning simulator for scan with ${args.length} files`)
+    
+    // Spawn the simulator with file paths as arguments
+    let simulator
+    if (isWindows) {
+      const quotedPath = `"${simulatorPath}"`
+      simulator = spawn(quotedPath, args, {
+        cwd: projectRoot,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: true
       })
-      
-      const statusColor = status === 'suspicious' 
-        ? (severity === 'high' ? 'red' : severity === 'medium' ? 'yellow' : 'orange')
-        : 'blue'
-      
-      res.write(`data: ${JSON.stringify({ 
-        type: 'scan_result',
-        message: `  ✓ Result: ${status.toUpperCase()}${matchedPattern ? ` (${matchedPattern.name})` : ''}\n`,
-        result: {
-          file: fileName,
-          status,
-          severity,
-          pattern: matchedPattern?.name || null,
-          color: statusColor
-        }
-      })}\n\n`)
+    } else {
+      simulator = spawn(simulatorPath, args, {
+        cwd: projectRoot,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: false
+      })
     }
     
-    // Summary
-    res.write(`data: ${JSON.stringify({ 
-      type: 'scan_summary',
-      message: `\n╔═══════════════════════════════════════════════════════════╗\n`
-    })}\n\n`)
-    res.write(`data: ${JSON.stringify({ 
-      type: 'scan_summary',
-      message: `║                    SCAN SUMMARY                          ║\n`
-    })}\n\n`)
-    res.write(`data: ${JSON.stringify({ 
-      type: 'scan_summary',
-      message: `╚═══════════════════════════════════════════════════════════╝\n\n`
-    })}\n\n`)
-    
-    res.write(`data: ${JSON.stringify({ 
-      type: 'scan_summary',
-      message: `[RESULTS]\n`
-    })}\n\n`)
-    res.write(`data: ${JSON.stringify({ 
-      type: 'scan_summary',
-      message: `  ✓ Safe files:        ${safeCount}\n`
-    })}\n\n`)
-    res.write(`data: ${JSON.stringify({ 
-      type: 'scan_summary',
-      message: `  ✗ Suspicious files:  ${suspiciousCount}\n`
-    })}\n\n`)
-    res.write(`data: ${JSON.stringify({ 
-      type: 'scan_summary',
-      message: `  Total scanned:       ${scanResults.length}\n\n`
-    })}\n\n`)
-    
-    if (suspiciousCount > 0) {
-      res.write(`data: ${JSON.stringify({ 
-        type: 'scan_summary',
-        message: `[SUSPICIOUS FILES DETECTED]\n`
-      })}\n\n`)
-      scanResults.filter(r => r.status === 'suspicious').forEach((result, idx) => {
-        res.write(`data: ${JSON.stringify({ 
-          type: 'scan_summary',
-          message: `  ${idx + 1}. ${result.file} (${result.pattern || 'unknown pattern'}, ${result.severity} risk)\n`
-        })}\n\n`)
-      })
-      res.write(`data: ${JSON.stringify({ 
-        type: 'scan_summary',
-        message: `\n`
-      })}\n\n`)
+    // Set encoding
+    if (simulator.stdout) {
+      simulator.stdout.setEncoding('utf8')
+    }
+    if (simulator.stderr) {
+      simulator.stderr.setEncoding('utf8')
     }
     
-    res.write(`data: ${JSON.stringify({ 
-      type: 'end', 
-      code: 0,
-      results: scanResults,
-      message: '\nScan completed successfully\n'
-    })}\n\n`)
+    // Handle stdout
+    if (simulator.stdout) {
+      simulator.stdout.on('data', (data) => {
+        const output = data.toString('utf8')
+        try {
+          res.write(`data: ${JSON.stringify({ type: 'stdout', message: output })}\n\n`)
+        } catch (e) {
+          console.error('Error writing to response:', e)
+        }
+      })
+    }
     
-    res.end()
+    // Handle stderr
+    if (simulator.stderr) {
+      simulator.stderr.on('data', (data) => {
+        const output = data.toString('utf8')
+        try {
+          res.write(`data: ${JSON.stringify({ type: 'stderr', message: output })}\n\n`)
+        } catch (e) {
+          console.error('Error writing to response:', e)
+        }
+      })
+    }
+    
+    // Handle errors
+    simulator.on('error', (error) => {
+      console.error('Simulator spawn error:', error)
+      clearInterval(keepAliveInterval)
+      res.write(`data: ${JSON.stringify({ type: 'error', message: `Error: ${error.message}\n` })}\n\n`)
+      res.end()
+    })
+    
+    // Handle completion
+    simulator.on('close', (code, signal) => {
+      console.log(`Simulator scan process closed - code: ${code}, signal: ${signal}`)
+      clearInterval(keepAliveInterval)
+      try {
+        const exitMessage = code !== null 
+          ? `\nScan completed with code ${code}\n`
+          : signal 
+            ? `\nProcess terminated by signal: ${signal}\n`
+            : `\nScan completed\n`
+        res.write(`data: ${JSON.stringify({ type: 'end', code, signal, message: exitMessage })}\n\n`)
+        res.end()
+      } catch (e) {
+        console.error('Error closing response:', e)
+      }
+    })
+    
+    // Handle client disconnect
+    res.on('close', () => {
+      console.log('Response stream closed (client disconnected)')
+      clearInterval(keepAliveInterval)
+      setTimeout(() => {
+        if (simulator && !simulator.killed) {
+          console.log('Killing simulator process due to client disconnect')
+          try {
+            simulator.kill('SIGTERM')
+            setTimeout(() => {
+              if (simulator && !simulator.killed) {
+                simulator.kill('SIGKILL')
+              }
+            }, 2000)
+          } catch (e) {
+            console.error('Error killing simulator:', e)
+          }
+        }
+      }, 2000)
+    })
+    
   } catch (error) {
-    console.error('Scan error:', error)
-    res.write(`data: ${JSON.stringify({ 
-      type: 'error', 
-      message: `Scan error: ${error.message}\n`
-    })}\n\n`)
+    res.write(`data: ${JSON.stringify({ type: 'error', message: `Failed to start scanner: ${error.message}\n` })}\n\n`)
     res.end()
   }
 })

@@ -19,7 +19,7 @@
 
 using namespace CS311;
 
-int main() {
+int main(int argc, char* argv[]) {
 #ifdef _WIN32
     // Ensure Windows console uses UTF-8 so box-drawing/Unicode prints correctly
     SetConsoleOutputCP(CP_UTF8);
@@ -27,13 +27,26 @@ int main() {
 #endif
 
     // Create module instances and ensure output directory exists
-    
-    
     std::filesystem::create_directories("output");
 
+    // Check if we're in scan mode (file paths provided as arguments)
+    bool scanMode = (argc > 1);
+    std::vector<std::string> filePaths;
+    
+    if (scanMode) {
+        // Collect file paths from command-line arguments
+        for (int i = 1; i < argc; ++i) {
+            filePaths.push_back(std::string(argv[i]));
+        }
+    }
+
     std::cout << "╔═══════════════════════════════════════════════════════════╗" << std::endl;
-    std::cout << "║   CS311 CHOMSKY HIERARCHY SECURITY SIMULATOR              ║" << std::endl;
-    std::cout << "║   Filename Detection & TCP Protocol Validation            ║" << std::endl;
+    if (scanMode) {
+        std::cout << "║   FILE SCAN MODULE - SUSPICIOUS FILENAME DETECTION        ║" << std::endl;
+    } else {
+        std::cout << "║   CS311 CHOMSKY HIERARCHY SECURITY SIMULATOR              ║" << std::endl;
+        std::cout << "║   Filename Detection & TCP Protocol Validation            ║" << std::endl;
+    }
     std::cout << "╚═══════════════════════════════════════════════════════════╝" << std::endl;
     
     // ========================================================================
@@ -42,7 +55,7 @@ int main() {
     printHeader("MODULE 1: Filename Pattern Detection (DFA)");
     std::cout << "[CHOMSKY TYPE-3: REGULAR LANGUAGE]" << std::endl;
     std::cout << "Using Deterministic Finite Automaton (DFA)" << std::endl;
-    std::cout << "Memory: None (stateless)" << std::endl;
+    std::cout << "Memory: Finite-state (no unbounded stack)" << std::endl;
     std::cout << "Capability: Pattern matching" << std::endl;
     std::cout << std::endl;
     
@@ -50,21 +63,50 @@ int main() {
     try {
         // Ensure output directory exists
         std::filesystem::create_directories("output");
-        dfaModule.loadDataset("archive/Malicious_file_trick_detection.jsonl");
-        dfaModule.definePatterns();
-        dfaModule.buildNFAs();          // Regex → NFA (Thompson's Construction)
-        dfaModule.convertToDFAs();       // NFA → DFA (Subset Construction)
-        dfaModule.minimizeDFAs();        // DFA minimization (Hopcroft's)
-        dfaModule.applyIGA();            // Improved Grouping Algorithm
-        dfaModule.testPatterns();        // Test using actual DFAs
-        dfaModule.generateReport();
+        
+        if (scanMode) {
+            // SCAN MODE: Scan provided file paths
+            // Build DFAs silently, then show file-by-file processing
+            dfaModule.definePatterns();
+            dfaModule.buildNFAs();          // Regex → NFA (Thompson's Construction)
+            dfaModule.convertToDFAs();       // NFA → DFA (Subset Construction)
+            dfaModule.minimizeDFAs();        // DFA minimization (Hopcroft's)
+            dfaModule.applyIGA();            // Improved Grouping Algorithm
+            
+            // Scan the provided files (this will show file-by-file details)
+            dfaModule.scanFiles(filePaths);
+        } else {
+            // NORMAL MODE: Use dataset files
+            printHeader("MODULE 1: Filename Pattern Detection (DFA)");
+            std::cout << "[CHOMSKY TYPE-3: REGULAR LANGUAGE]" << std::endl;
+            std::cout << "Using Deterministic Finite Automaton (DFA)" << std::endl;
+            std::cout << "Memory: Finite-state (no unbounded stack)" << std::endl;
+            std::cout << "Capability: Pattern matching" << std::endl;
+            std::cout << std::endl;
+            
+            dfaModule.loadDataset("archive/Malicious_file_trick_detection.jsonl");
+            dfaModule.definePatterns();
+            dfaModule.buildNFAs();          // Regex → NFA (Thompson's Construction)
+            dfaModule.convertToDFAs();       // NFA → DFA (Subset Construction)
+            dfaModule.minimizeDFAs();        // DFA minimization (Hopcroft's)
+            dfaModule.applyIGA();            // Improved Grouping Algorithm
+            dfaModule.testPatterns();        // Test using actual DFAs
+            dfaModule.generateReport();
+        }
     } catch (const std::exception& e) {
         std::cerr << "[ERROR] DFA Module failed: " << e.what() << std::endl;
+        return 1;
     }
     
     // ========================================================================
     // MODULE 2: PDA-based TCP Protocol Validation (Type-2 Context-Free)
+    // Skip PDA module in scan mode
     // ========================================================================
+    if (scanMode) {
+        std::cout << "\n[INFO] Scan complete. PDA module skipped in scan mode." << std::endl;
+        return 0;
+    }
+    
     printHeader("MODULE 2: TCP Protocol Validation (PDA)");
     std::cout << "[CHOMSKY TYPE-2: CONTEXT-FREE LANGUAGE]" << std::endl;
     std::cout << "Using Pushdown Automaton (PDA)" << std::endl;
@@ -239,15 +281,19 @@ int main() {
     }
     
     // ========================================================================
-    // CHOMSKY HIERARCHY COMPARISON
+    // CHOMSKY HIERARCHY COMPARISON (skip in scan mode)
     // ========================================================================
+    if (scanMode) {
+        return 0;
+    }
+    
     printHeader("CHOMSKY HIERARCHY DEMONSTRATION");
     
     std::cout << "┌─────────────────────┬──────────────────┬──────────────────┐" << std::endl;
     std::cout << "│ Aspect              │ DFA (Regular)    │ PDA (Context-Free)│" << std::endl;
     std::cout << "├─────────────────────┼──────────────────┼──────────────────┤" << std::endl;
     std::cout << "│ Chomsky Type        │ Type 3           │ Type 2           │" << std::endl;
-    std::cout << "│ Memory              │ None (stateless) │ Stack (unbounded)│" << std::endl;
+    std::cout << "│ Memory              │ Finite-state     │ Stack (unbounded)│" << std::endl;
     std::cout << "│ Can match patterns  │ ✓ Yes            │ ✓ Yes            │" << std::endl;
     std::cout << "│ Can count/pair      │ ✗ No             │ ✓ Yes            │" << std::endl;
     std::cout << "│ Grammar             │ Regular (a→αB)   │ CFG (A→α)        │" << std::endl;

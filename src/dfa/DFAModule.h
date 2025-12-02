@@ -48,6 +48,11 @@ public:
     void applyIGA();
     void testPatterns();
     void generateReport();
+    // Scan custom file paths using DFA modules
+    void scanFiles(const std::vector<std::string>& filePaths);
+    void generateScanReport(const std::vector<std::string>& filePaths, 
+                           const std::vector<bool>& detected, 
+                           const std::vector<std::string>& matched_patterns);
     // Export Graphviz DOT for the built DFAs (after convertToDFAs / applyIGA)
     std::string exportGraphvizAll() const;
     // Export single DFA cluster by index (useful to write separate files)

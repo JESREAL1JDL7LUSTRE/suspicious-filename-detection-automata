@@ -4,6 +4,7 @@ import type { Node } from 'reactflow'
 import 'reactflow/dist/style.css'
 import type { Graph } from '../parser/json'
 import type { ScanResult } from '../hooks/useFileScan'
+import { FileProcessingIndicator } from './FileProcessingIndicator'
 
 // Memoize nodeTypes and edgeTypes outside component to avoid React Flow warning
 const nodeTypes = {}
@@ -17,6 +18,7 @@ interface GraphVisualizationProps {
   isRunning: boolean
   scanResults?: ScanResult[]
   isScanMode?: boolean
+  totalFiles?: number
 }
 
 // Color mapping for status
@@ -36,7 +38,8 @@ export function GraphVisualization({
   hasRunSimulator,
   isRunning,
   scanResults = [],
-  isScanMode = false
+  isScanMode = false,
+  totalFiles
 }: GraphVisualizationProps) {
   // Debug logging
   console.log('GraphVisualization render:', {
@@ -53,49 +56,88 @@ export function GraphVisualization({
       return graph.nodes
     }
 
-    // Create a map of scan results by index for progressive coloring
-    // Each scan result corresponds to a node index (modulo for cycling)
-    return graph.nodes.map((node: Node, nodeIndex: number) => {
-      // Map scan results to nodes progressively
-      // Use modulo to cycle through nodes if we have more results than nodes
-      const resultIndex = nodeIndex % scanResults.length
-      const result = scanResults[resultIndex]
-      
-      // Also try to match by pattern name in node label
-      // ReactFlow stores label in node.data.label, not node.label
+    // Color nodes based on scan results
+    // Collect all unique patterns and their severities from scan results
+    const patternSeverityMap = new Map<string, 'high' | 'medium' | 'low' | 'safe'>()
+    const patternStatusMap = new Map<string, 'suspicious' | 'safe'>()
+    
+    for (const result of scanResults) {
+      if (result.pattern) {
+        // Store the highest severity for each pattern (high > medium > low)
+        const currentSeverity = patternSeverityMap.get(result.pattern)
+        if (!currentSeverity || 
+            (result.severity === 'high') ||
+            (result.severity === 'medium' && currentSeverity !== 'high') ||
+            (result.severity === 'low' && currentSeverity === 'safe')) {
+          patternSeverityMap.set(result.pattern, result.severity)
+          patternStatusMap.set(result.pattern, result.status)
+        }
+      }
+    }
+    
+    return graph.nodes.map((node: Node) => {
+      // Get node label for matching
       const nodeLabel = ((node.data?.label as string) || node.id || '').toLowerCase()
-      let matchedResult: ScanResult | null = result
+      let matchedPattern: string | null = null
+      let matchedSeverity: 'high' | 'medium' | 'low' | 'safe' = 'safe'
+      let matchedStatus: 'suspicious' | 'safe' = 'safe'
       
-      // Try to find a better match based on pattern
-      for (const scanResult of scanResults) {
-        if (scanResult.pattern && nodeLabel.includes(scanResult.pattern.toLowerCase())) {
-          matchedResult = scanResult
+      // Try to match by pattern name in node label
+      for (const [pattern, severity] of patternSeverityMap.entries()) {
+        const patternLower = pattern.toLowerCase()
+        // Check if node label contains pattern or pattern-related terms
+        if (nodeLabel.includes(patternLower) || 
+            nodeLabel.includes(patternLower.replace('_', ' ')) ||
+            nodeLabel.includes(patternLower.replace('_', ''))) {
+          matchedPattern = pattern
+          matchedSeverity = severity
+          matchedStatus = patternStatusMap.get(pattern) || 'safe'
           break
         }
       }
       
       // Color based on the matched result
-      if (matchedResult) {
+      if (matchedPattern && matchedStatus === 'suspicious') {
+        // Color based on severity: red for high, yellow for medium, orange for low
+        const color = matchedSeverity === 'high' ? '#ef4444' : // red
+                     matchedSeverity === 'medium' ? '#eab308' : // yellow
+                     '#f97316' // orange
         return {
           ...node,
           style: {
             ...node.style,
-            backgroundColor: getStatusColor(matchedResult.status, matchedResult.severity),
-            borderColor: getStatusColor(matchedResult.status, matchedResult.severity),
+            backgroundColor: color,
+            borderColor: color,
+            borderWidth: 2,
             color: '#ffffff',
-            transition: 'background-color 0.3s ease, border-color 0.3s ease'
+            transition: 'background-color 0.5s ease, border-color 0.5s ease'
+          }
+        }
+      } else if (matchedPattern && matchedStatus === 'safe') {
+        // Blue for safe files
+        return {
+          ...node,
+          style: {
+            ...node.style,
+            backgroundColor: '#3b82f6', // blue
+            borderColor: '#2563eb', // blue-600
+            borderWidth: 2,
+            color: '#ffffff',
+            transition: 'background-color 0.5s ease, border-color 0.5s ease'
           }
         }
       }
 
-      // Default: blue for safe/unknown
+      // Default: consistent gray color for unmatched nodes (states not related to scan results)
       return {
         ...node,
         style: {
           ...node.style,
-          backgroundColor: '#3b82f6',
-          borderColor: '#3b82f6',
-          color: '#ffffff'
+          backgroundColor: '#94a3b8', // slate-400 - consistent gray
+          borderColor: '#64748b', // slate-500
+          borderWidth: 2,
+          color: '#ffffff',
+          transition: 'background-color 0.5s ease, border-color 0.5s ease'
         }
       }
     })
