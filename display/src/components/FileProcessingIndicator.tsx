@@ -124,9 +124,32 @@ export function FileProcessingIndicator({
     : (totalFiles && scanResults.length > 0 ? (scanResults.length / totalFiles) * 100 : 0)
   
   // Find current result - match by filename or use the most recent one
-  const currentResult = currentFileName 
-    ? scanResults.find(r => r.file === currentFileName || r.file.includes(currentFileName) || currentFileName.includes(r.file)) 
-    : (scanResults.length > 0 ? scanResults[scanResults.length - 1] : null)
+  // Also check by index to ensure we get the right result
+  let currentResult: ScanResult | null = null
+  if (currentFileName) {
+    // First try to find by exact filename match
+    currentResult = scanResults.find(r => r.file === currentFileName)
+    
+    // If not found, try partial match
+    if (!currentResult) {
+      currentResult = scanResults.find(r => 
+        r.file.includes(currentFileName) || 
+        currentFileName.includes(r.file) ||
+        r.path.includes(currentFileName) ||
+        currentFileName.includes(r.path)
+      )
+    }
+    
+    // If still not found, try by index (currentFileIndex is 1-based, scanResults is 0-based)
+    if (!currentResult && currentFileIndex > 0 && currentFileIndex <= scanResults.length) {
+      currentResult = scanResults[currentFileIndex - 1]
+    }
+  }
+  
+  // Fallback to most recent result
+  if (!currentResult && scanResults.length > 0) {
+    currentResult = scanResults[scanResults.length - 1]
+  }
 
   const getStatusColor = (status: string, severity?: string) => {
     if (status === 'suspicious') {

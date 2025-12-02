@@ -96,6 +96,7 @@ function App() {
               hasRunSimulator={simulator.hasRunSimulator || fileScan.scanResults.length > 0}
               isRunning={isRunning}
               scanResults={fileScan.scanResults}
+              visitedStates={fileScan.visitedStates}
               isScanMode={mode === 'scan' && fileScan.scanResults.length > 0}
               totalFiles={selectedFiles.length}
             />

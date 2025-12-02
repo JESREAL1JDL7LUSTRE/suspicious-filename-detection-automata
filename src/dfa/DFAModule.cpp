@@ -342,7 +342,7 @@ bool DFAModule::testFilenameWithDFA(const std::string& filename, std::string& ma
 
 // Run a DFA on input string
 bool DFAModule::runDFA(const DFA& dfa, const std::string& input) {
-    return dfa.accepts(input);
+    return dfa.accepts(input, true); // Enable verbose mode to show state transitions
 }
 
 // Additional pattern checks (for comprehensive detection)
@@ -653,6 +653,8 @@ void DFAModule::scanFiles(const std::vector<std::string>& filePaths) {
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         
         std::string matched;
+        std::cout << "  → Running DFA simulation..." << std::endl;
+        std::cout.flush();
         bool isDetected = testFilenameWithDFA(fileName, matched);
         
         detected.push_back(isDetected);

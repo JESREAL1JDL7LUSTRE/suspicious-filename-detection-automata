@@ -3,7 +3,7 @@ import ReactFlow, { Background, Controls, MiniMap, ReactFlowProvider } from 'rea
 import type { Node } from 'reactflow'
 import 'reactflow/dist/style.css'
 import type { Graph } from '../parser/json'
-import type { ScanResult } from '../hooks/useFileScan'
+import type { ScanResult, VisitedState } from '../hooks/useFileScan'
 import { FileProcessingIndicator } from './FileProcessingIndicator'
 
 // Memoize nodeTypes and edgeTypes outside component to avoid React Flow warning
@@ -17,6 +17,7 @@ interface GraphVisualizationProps {
   hasRunSimulator: boolean
   isRunning: boolean
   scanResults?: ScanResult[]
+  visitedStates?: VisitedState[]
   isScanMode?: boolean
   totalFiles?: number
 }
@@ -38,6 +39,7 @@ export function GraphVisualization({
   hasRunSimulator,
   isRunning,
   scanResults = [],
+  visitedStates = [],
   isScanMode = false,
   totalFiles
 }: GraphVisualizationProps) {
@@ -49,86 +51,99 @@ export function GraphVisualization({
     scanResults: scanResults.length
   })
   
-  // Update node colors based on scan results - progressive coloring
+  // Update node colors based on visited states - progressive coloring
   const coloredNodes = useMemo(() => {
-    // If not in scan mode or no results, return original nodes
-    if (!isScanMode || scanResults.length === 0) {
+    // If not in scan mode, return original nodes
+    if (!isScanMode) {
       return graph.nodes
     }
 
-    // Color nodes based on scan results
-    // Collect all unique patterns and their severities from scan results
-    const patternSeverityMap = new Map<string, 'high' | 'medium' | 'low' | 'safe'>()
-    const patternStatusMap = new Map<string, 'suspicious' | 'safe'>()
+    // Create a map of visited states with their status and severity
+    // Use the most recent visit for each state (in case it's visited multiple times)
+    const stateVisitMap = new Map<string, { status: 'suspicious' | 'safe', severity: 'high' | 'medium' | 'low' | 'safe', timestamp: number }>()
     
-    for (const result of scanResults) {
-      if (result.pattern) {
-        // Store the highest severity for each pattern (high > medium > low)
-        const currentSeverity = patternSeverityMap.get(result.pattern)
-        if (!currentSeverity || 
-            (result.severity === 'high') ||
-            (result.severity === 'medium' && currentSeverity !== 'high') ||
-            (result.severity === 'low' && currentSeverity === 'safe')) {
-          patternSeverityMap.set(result.pattern, result.severity)
-          patternStatusMap.set(result.pattern, result.status)
-        }
+    for (const visitedState of visitedStates) {
+      const existing = stateVisitMap.get(visitedState.stateId)
+      // Keep the most recent visit (higher timestamp = later)
+      if (!existing || visitedState.timestamp > existing.timestamp) {
+        stateVisitMap.set(visitedState.stateId, {
+          status: visitedState.status,
+          severity: visitedState.severity || 'safe',
+          timestamp: visitedState.timestamp
+        })
       }
     }
     
+    // Debug: log visited states and node IDs
+    if (visitedStates.length > 0) {
+      console.log('🔴 GraphVisualization - Visited states:', visitedStates.map(v => v.stateId))
+      console.log('🔴 GraphVisualization - State visit map keys:', Array.from(stateVisitMap.keys()))
+      console.log('🔴 GraphVisualization - Sample node IDs:', graph.nodes.slice(0, 5).map(n => ({ id: n.id, label: n.data?.label })))
+      console.log('🔴 GraphVisualization - Total nodes:', graph.nodes.length, 'Total visited:', visitedStates.length)
+    } else {
+      console.log('🔴 GraphVisualization - No visited states yet. isScanMode:', isScanMode, 'visitedStates.length:', visitedStates.length)
+    }
+    
     return graph.nodes.map((node: Node) => {
-      // Get node label for matching
+      // Extract state ID from node (could be in id, label, or data.label)
+      const nodeId = node.id || ''
       const nodeLabel = ((node.data?.label as string) || node.id || '').toLowerCase()
-      let matchedPattern: string | null = null
-      let matchedSeverity: 'high' | 'medium' | 'low' | 'safe' = 'safe'
-      let matchedStatus: 'suspicious' | 'safe' = 'safe'
       
-      // Try to match by pattern name in node label
-      for (const [pattern, severity] of patternSeverityMap.entries()) {
-        const patternLower = pattern.toLowerCase()
-        // Check if node label contains pattern or pattern-related terms
-        if (nodeLabel.includes(patternLower) || 
-            nodeLabel.includes(patternLower.replace('_', ' ')) ||
-            nodeLabel.includes(patternLower.replace('_', ''))) {
-          matchedPattern = pattern
-          matchedSeverity = severity
-          matchedStatus = patternStatusMap.get(pattern) || 'safe'
-          break
+      // Try to match node to visited state
+      // Check if node ID matches a visited state (e.g., "q0", "q1")
+      let visitedStateInfo: { status: 'suspicious' | 'safe', severity: 'high' | 'medium' | 'low' | 'safe' } | null = null
+      
+      // Try exact match first (node.id might be "q0", "q1", etc.)
+      if (stateVisitMap.has(nodeId)) {
+        visitedStateInfo = stateVisitMap.get(nodeId)!
+      } else {
+        // Try to extract state number from node ID or label
+        const stateMatch = (nodeId || nodeLabel).match(/q?(\d+)/i)
+        if (stateMatch) {
+          const stateId = `q${stateMatch[1]}`
+          if (stateVisitMap.has(stateId)) {
+            visitedStateInfo = stateVisitMap.get(stateId)!
+          }
         }
       }
       
-      // Color based on the matched result
-      if (matchedPattern && matchedStatus === 'suspicious') {
-        // Color based on severity: red for high, yellow for medium, orange for low
-        const color = matchedSeverity === 'high' ? '#ef4444' : // red
-                     matchedSeverity === 'medium' ? '#eab308' : // yellow
-                     '#f97316' // orange
-        return {
-          ...node,
-          style: {
-            ...node.style,
-            backgroundColor: color,
-            borderColor: color,
-            borderWidth: 2,
-            color: '#ffffff',
-            transition: 'background-color 0.5s ease, border-color 0.5s ease'
+      // Color based on visited state
+      if (visitedStateInfo) {
+        if (visitedStateInfo.status === 'suspicious') {
+          // Color based on severity: red for high, yellow for medium, orange for low
+          const color = visitedStateInfo.severity === 'high' ? '#ef4444' : // red
+                       visitedStateInfo.severity === 'medium' ? '#eab308' : // yellow
+                       '#f97316' // orange
+          return {
+            ...node,
+            style: {
+              ...node.style,
+              backgroundColor: color,
+              borderColor: color,
+              borderWidth: 3,
+              color: '#ffffff',
+              transition: 'background-color 0.3s ease, border-color 0.3s ease, border-width 0.3s ease',
+              boxShadow: '0 0 8px rgba(239, 68, 68, 0.5)'
+            }
           }
-        }
-      } else if (matchedPattern && matchedStatus === 'safe') {
-        // Blue for safe files
-        return {
-          ...node,
-          style: {
-            ...node.style,
-            backgroundColor: '#3b82f6', // blue
-            borderColor: '#2563eb', // blue-600
-            borderWidth: 2,
-            color: '#ffffff',
-            transition: 'background-color 0.5s ease, border-color 0.5s ease'
+        } else {
+          // Blue for safe files
+          return {
+            ...node,
+            style: {
+              ...node.style,
+              backgroundColor: '#3b82f6', // blue
+              borderColor: '#2563eb', // blue-600
+              borderWidth: 3,
+              color: '#ffffff',
+              transition: 'background-color 0.3s ease, border-color 0.3s ease, border-width 0.3s ease',
+              boxShadow: '0 0 8px rgba(59, 130, 246, 0.5)'
+            }
           }
         }
       }
 
-      // Default: consistent gray color for unmatched nodes (states not related to scan results)
+      // Default: gray for unvisited states
       return {
         ...node,
         style: {
@@ -137,11 +152,11 @@ export function GraphVisualization({
           borderColor: '#64748b', // slate-500
           borderWidth: 2,
           color: '#ffffff',
-          transition: 'background-color 0.5s ease, border-color 0.5s ease'
+          transition: 'background-color 0.3s ease, border-color 0.3s ease'
         }
       }
     })
-  }, [graph.nodes, scanResults, isScanMode])
+  }, [graph.nodes, visitedStates, isScanMode])
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
