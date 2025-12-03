@@ -11,10 +11,20 @@ export interface ScanResult {
   color: 'red' | 'yellow' | 'orange' | 'blue'
 }
 
+export interface VisitedState {
+  stateId: string // e.g., "q0", "q1"
+  fileIndex: number // Which file was being processed
+  status: 'suspicious' | 'safe'
+  severity?: 'high' | 'medium' | 'low' | 'safe'
+  timestamp: number
+}
+
 export function useFileScan(onComplete?: (results: ScanResult[]) => void) {
   const [terminalOutput, setTerminalOutput] = useState<string[]>([])
   const [isScanning, setIsScanning] = useState(false)
   const [scanResults, setScanResults] = useState<ScanResult[]>([])
+  const [visitedStates, setVisitedStates] = useState<VisitedState[]>([])
+  const currentFileIndexRef = useRef<number>(0)
   const abortControllerRef = useRef<AbortController | null>(null)
 
   const scanFiles = useCallback(async (files: File[]) => {
@@ -30,6 +40,8 @@ export function useFileScan(onComplete?: (results: ScanResult[]) => void) {
     setIsScanning(true)
     setTerminalOutput([])
     setScanResults([])
+    setVisitedStates([])
+    currentFileIndexRef.current = 0
 
     try {
       // Extract file paths/names from File objects
@@ -98,104 +110,239 @@ export function useFileScan(onComplete?: (results: ScanResult[]) => void) {
                     const message = data.message || ''
                     setTerminalOutput((prev) => [...prev, message])
                     
-                    // Parse C++ output to extract scan results
-                    // Look for lines like: "[1/32] Analyzing: filename" and "✓ Result: SUSPICIOUS/SAFE"
-                    const analyzingMatch = message.match(/\[(\d+)\/(\d+)\]\s*Analyzing:\s*([^\n\r]+)/i)
-                    if (analyzingMatch) {
-                      const fileName = analyzingMatch[3].trim()
-                      // Extract filename from path if needed
-                      const cleanFileName = fileName.split(/[/\\]/).pop() || fileName
-                      
-                      // Check if we already have this result
-                      const existingIndex = results.findIndex(r => r.file === cleanFileName)
-                      if (existingIndex === -1) {
-                        // Create a placeholder result (will be updated when we see the result)
-                        const newResult: ScanResult = {
-                          file: cleanFileName,
-                          path: fileName,
-                          status: 'safe', // Will be updated
-                          severity: 'safe',
-                          pattern: null,
-                          color: 'blue'
-                        }
-                        results.push(newResult)
-                        setScanResults((prev) => [...prev, newResult])
-                      }
+                    // Split message by newlines to handle multi-line messages
+                    const lines = message.split(/\r?\n/)
+                    
+                    // Debug: log if message contains state transitions
+                    if (message.includes('State:') || message.includes('Final state')) {
+                      console.log('📦 Message contains state transitions, splitting into', lines.length, 'lines')
+                      console.log('📦 Sample lines:', lines.slice(0, 3).map(l => l.substring(0, 50)))
                     }
                     
-                    // Look for result lines: "✓ Result: SUSPICIOUS (pattern)" or "✓ Result: SAFE"
-                    // These come right after the analyzing line, so match to the most recent unupdated result
-                    const resultMatch = message.match(/✓\s*Result:\s*(SUSPICIOUS|SAFE)(?:\s*\(([^)]+)\))?/i)
-                    if (resultMatch) {
-                      const status = resultMatch[1].toLowerCase() === 'suspicious' ? 'suspicious' : 'safe'
-                      const pattern = resultMatch[2] || null
-                      
-                      // Find the most recent result that hasn't been fully updated
-                      // Look for the last result that is still a placeholder (has default values)
-                      let updated = false
-                      for (let i = results.length - 1; i >= 0; i--) {
-                        // Check if this result is still a placeholder
-                        // A placeholder has: status='safe', pattern=null, severity='safe'
-                        const isPlaceholder = results[i].status === 'safe' && 
-                                             results[i].pattern === null && 
-                                             results[i].severity === 'safe'
+                    // Parse each line individually
+                    for (const line of lines) {
+                      // Parse C++ output to extract scan results
+                      // Look for lines like: "[1/32] Analyzing: filename" and "✓ Result: SUSPICIOUS/SAFE"
+                      const analyzingMatch = line.match(/\[(\d+)\/(\d+)\]\s*Analyzing:\s*([^\n\r]+)/i)
+                      if (analyzingMatch) {
+                        const fileIndex = parseInt(analyzingMatch[1]) - 1 // Convert to 0-based
+                        currentFileIndexRef.current = fileIndex
+                        const fileName = analyzingMatch[3].trim()
+                        // Extract filename from path if needed
+                        const cleanFileName = fileName.split(/[/\\]/).pop() || fileName
                         
-                        if (isPlaceholder) {
-                          // Update this result with the actual status
-                          const updatedResult: ScanResult = {
-                            ...results[i],
+                        // Check if we already have this result
+                        const existingIndex = results.findIndex(r => r.file === cleanFileName)
+                        if (existingIndex === -1) {
+                          // Create a placeholder result (will be updated when we see the result)
+                          const newResult: ScanResult = {
+                            file: cleanFileName,
+                            path: fileName,
+                            status: 'safe', // Will be updated
+                            severity: 'safe',
+                            pattern: null,
+                            color: 'blue'
+                          }
+                          results.push(newResult)
+                          setScanResults((prev) => [...prev, newResult])
+                        } else {
+                          // Update file index if result already exists
+                          currentFileIndexRef.current = existingIndex
+                        }
+                      }
+                      
+                      // Look for result lines: "✓ Result: SUSPICIOUS (pattern)" or "✓ Result: SAFE"
+                      // These come right after the analyzing line, so match to the most recent unupdated result
+                      const resultMatch = line.match(/✓\s*Result:\s*(SUSPICIOUS|SAFE)(?:\s*\(([^)]+)\))?/i)
+                      if (resultMatch) {
+                        const status = resultMatch[1].toLowerCase() === 'suspicious' ? 'suspicious' : 'safe'
+                        const pattern = resultMatch[2] || null
+                        const severity = status === 'suspicious' 
+                          ? (pattern === 'executable' || pattern === 'screensaver' ? 'high' : 
+                             pattern === 'batch_file' || pattern === 'vbscript' ? 'medium' : 'low')
+                          : 'safe'
+                        
+                        // Find the most recent result that hasn't been fully updated
+                        // Look for the last result that is still a placeholder (has default values)
+                        let updated = false
+                        let updatedIndex = -1
+                        for (let i = results.length - 1; i >= 0; i--) {
+                          // Check if this result is still a placeholder
+                          // A placeholder has: status='safe', pattern=null, severity='safe'
+                          const isPlaceholder = results[i].status === 'safe' && 
+                                               results[i].pattern === null && 
+                                               results[i].severity === 'safe'
+                          
+                          if (isPlaceholder) {
+                            // Update this result with the actual status
+                            const updatedResult: ScanResult = {
+                              ...results[i],
+                              status: status,
+                              severity: severity,
+                              pattern: pattern,
+                              color: status === 'suspicious'
+                                ? (pattern === 'executable' || pattern === 'screensaver' ? 'red' : 
+                                   pattern === 'batch_file' || pattern === 'vbscript' ? 'yellow' : 'orange')
+                                : 'blue'
+                            }
+                            results[i] = updatedResult
+                            updatedIndex = i
+                            setScanResults((prev) => {
+                              const newResults = [...prev]
+                              newResults[i] = updatedResult
+                              return newResults
+                            })
+                            updated = true
+                            break
+                          }
+                        }
+                        
+                        // If no placeholder found but we have a result, create a new one
+                        // This handles cases where the result comes before the analyzing line
+                        if (!updated && resultMatch) {
+                          const newResult: ScanResult = {
+                            file: `file_${results.length + 1}`, // Fallback name
+                            path: '',
                             status: status,
-                            severity: status === 'suspicious' 
-                              ? (pattern === 'executable' || pattern === 'screensaver' ? 'high' : 
-                                 pattern === 'batch_file' || pattern === 'vbscript' ? 'medium' : 'low')
-                              : 'safe',
+                            severity: severity,
                             pattern: pattern,
                             color: status === 'suspicious'
                               ? (pattern === 'executable' || pattern === 'screensaver' ? 'red' : 
                                  pattern === 'batch_file' || pattern === 'vbscript' ? 'yellow' : 'orange')
                               : 'blue'
                           }
-                          results[i] = updatedResult
-                          setScanResults((prev) => {
-                            const newResults = [...prev]
-                            newResults[i] = updatedResult
-                            return newResults
+                          results.push(newResult)
+                          updatedIndex = results.length - 1
+                          setScanResults((prev) => [...prev, newResult])
+                        }
+                        
+                        // Update all visited states for this file index with the correct status
+                        if (updatedIndex >= 0) {
+                          const fileIndex = updatedIndex
+                          setVisitedStates((prev) => {
+                            return prev.map(vs => {
+                              if (vs.fileIndex === fileIndex) {
+                                return {
+                                  ...vs,
+                                  status: status,
+                                  severity: severity,
+                                  timestamp: Date.now() // Update timestamp to keep it recent
+                                }
+                              }
+                              return vs
+                            })
                           })
-                          updated = true
-                          break
                         }
                       }
                       
-                      // If no placeholder found but we have a result, create a new one
-                      // This handles cases where the result comes before the analyzing line
-                      if (!updated && resultMatch) {
-                        const newResult: ScanResult = {
-                          file: `file_${results.length + 1}`, // Fallback name
-                          path: '',
-                          status: status,
-                          severity: status === 'suspicious' 
-                            ? (pattern === 'executable' || pattern === 'screensaver' ? 'high' : 
-                               pattern === 'batch_file' || pattern === 'vbscript' ? 'medium' : 'low')
-                            : 'safe',
-                          pattern: pattern,
-                          color: status === 'suspicious'
-                            ? (pattern === 'executable' || pattern === 'screensaver' ? 'red' : 
-                               pattern === 'batch_file' || pattern === 'vbscript' ? 'yellow' : 'orange')
-                            : 'blue'
+                      // Parse state transitions: "State: q0 → q1" or "q0 → q1"
+                      // Also match "Final state: q1"
+                      // The line might have leading spaces: "  State: q0 → q0"
+                      const trimmedLine = line.trim()
+                      
+                      // Check if line contains state transition patterns
+                      if (trimmedLine.includes('State:') || trimmedLine.includes('Final state')) {
+                        // Try multiple regex patterns to match state transitions
+                        // The format is: "State: q0 → q1 (symbol: 'x')" or "Final state: q1"
+                        // Pattern 1: "State: q0 → q1" - match the exact format with Unicode arrow (may have text after)
+                        let stateTransitionMatch = trimmedLine.match(/State:\s*q(\d+)\s*→\s*q(\d+)/i)
+                        // Pattern 2: "State: q0 -> q1" - match ASCII arrow
+                        if (!stateTransitionMatch) {
+                          stateTransitionMatch = trimmedLine.match(/State:\s*q(\d+)\s*->\s*q(\d+)/i)
                         }
-                        results.push(newResult)
-                        setScanResults((prev) => [...prev, newResult])
+                        // Pattern 3: "q0 → q1" (without "State:")
+                        if (!stateTransitionMatch) {
+                          stateTransitionMatch = trimmedLine.match(/^q(\d+)\s*→\s*q(\d+)/i)
+                        }
+                        if (!stateTransitionMatch) {
+                          stateTransitionMatch = trimmedLine.match(/^q(\d+)\s*->\s*q(\d+)/i)
+                        }
+                        // Pattern 4: "Final state: q1"
+                        const finalStateMatch = trimmedLine.match(/Final\s+state:\s*q(\d+)/i)
+                        
+                        // Always log to see what's happening
+                        console.log('🔍 State line analysis:', {
+                          line: trimmedLine.substring(0, 60),
+                          stateTransitionMatch: stateTransitionMatch ? `q${stateTransitionMatch[1]} → q${stateTransitionMatch[2]}` : null,
+                          finalStateMatch: finalStateMatch ? `q${finalStateMatch[1]}` : null,
+                          isScanning,
+                          hasMatch: !!(stateTransitionMatch || finalStateMatch),
+                          regexTest1: /State:\s*q(\d+)\s*→\s*q(\d+)/i.test(trimmedLine),
+                          regexTest2: /State:\s*q(\d+)\s*->\s*q(\d+)/i.test(trimmedLine)
+                        })
+                        
+                        // Process state transition if matched
+                        // Process even if isScanning is false (might be stale closure value)
+                        // As long as we have results, we're in a scan context
+                        if (stateTransitionMatch || finalStateMatch) {
+                          const stateTo = finalStateMatch 
+                            ? `q${finalStateMatch[1]}` 
+                            : `q${stateTransitionMatch![2]}`
+                          
+                          // Get current file result - use the most recent one if available
+                          // Use the file index from the ref, or fall back to the last result
+                          const fileIndex = currentFileIndexRef.current >= 0 
+                            ? currentFileIndexRef.current 
+                            : (results.length > 0 ? results.length - 1 : 0)
+                          
+                          // Get the result for this file index
+                          // Note: The result might still be a placeholder (status='safe') if the result line hasn't been parsed yet
+                          // It will be updated later when the result line is parsed
+                          const currentFileResult = results[fileIndex] || results[results.length - 1]
+                          
+                          // Debug logging
+                          console.log('🔵 State transition detected:', {
+                            originalLine: line.substring(0, 50),
+                            trimmedLine: trimmedLine.substring(0, 50),
+                            stateTo,
+                            fileIndex: fileIndex,
+                            currentFileResult: currentFileResult?.status,
+                            isPlaceholder: currentFileResult?.status === 'safe' && currentFileResult?.pattern === null,
+                            totalResults: results.length,
+                            isScanning, // Log for debugging
+                            stateTransitionMatch: stateTransitionMatch ? `q${stateTransitionMatch[1]} → q${stateTransitionMatch[2]}` : null,
+                            finalStateMatch: finalStateMatch ? `q${finalStateMatch[1]}` : null
+                          })
+                          
+                          // Add visited state with current file's status
+                          // Note: If the result is still a placeholder, it will be updated when the result line is parsed
+                          const visitedState: VisitedState = {
+                            stateId: stateTo,
+                            fileIndex: fileIndex,
+                            status: currentFileResult?.status || 'safe',
+                            severity: currentFileResult?.severity || 'safe',
+                            timestamp: Date.now()
+                          }
+                          
+                          setVisitedStates((prev) => {
+                            // Add the state - allow multiple visits but keep the most recent
+                            const existingIndex = prev.findIndex(v => v.stateId === stateTo && v.fileIndex === visitedState.fileIndex)
+                            if (existingIndex >= 0) {
+                              // Update existing visit with new timestamp
+                              const updated = [...prev]
+                              updated[existingIndex] = visitedState
+                              console.log('🟢 Updated visited state:', stateTo, 'Total visited:', updated.length)
+                              return updated
+                            } else {
+                              // Add new visit
+                              const newList = [...prev, visitedState]
+                              console.log('🟢 Added visited state:', stateTo, 'Total visited:', newList.length)
+                              return newList
+                            }
+                          })
+                        }
                       }
-                    }
-                    // Also parse the final summary line: "✓ Safe files: X" and "✗ Suspicious files: Y"
-                    const safeCountMatch = message.match(/✓\s*Safe files:\s*(\d+)/i)
-                    const suspiciousCountMatch = message.match(/✗\s*Suspicious files:\s*(\d+)/i)
-                    
-                    if (safeCountMatch || suspiciousCountMatch) {
-                      // Summary found - ensure all results are properly set
-                      // Results should already be parsed from individual file results above
-                      // Just ensure the final state is correct
-                      setScanResults((prev) => [...prev]) // Trigger re-render with current results
+                      
+                      // Also parse the final summary line: "✓ Safe files: X" and "✗ Suspicious files: Y"
+                      const safeCountMatch = line.match(/✓\s*Safe files:\s*(\d+)/i)
+                      const suspiciousCountMatch = line.match(/✗\s*Suspicious files:\s*(\d+)/i)
+                      
+                      if (safeCountMatch || suspiciousCountMatch) {
+                        // Summary found - ensure all results are properly set
+                        // Results should already be parsed from individual file results above
+                        // Just ensure the final state is correct
+                        setScanResults((prev) => [...prev]) // Trigger re-render with current results
+                      }
                     }
                   } 
                   // Handle legacy scan types (for backward compatibility)
@@ -267,6 +414,8 @@ export function useFileScan(onComplete?: (results: ScanResult[]) => void) {
   const reset = useCallback(() => {
     setTerminalOutput([])
     setScanResults([])
+    setVisitedStates([])
+    currentFileIndexRef.current = 0
     setIsScanning(false)
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
@@ -278,6 +427,7 @@ export function useFileScan(onComplete?: (results: ScanResult[]) => void) {
     terminalOutput,
     isScanning,
     scanResults,
+    visitedStates,
     scanFiles,
     stopScan,
     reset

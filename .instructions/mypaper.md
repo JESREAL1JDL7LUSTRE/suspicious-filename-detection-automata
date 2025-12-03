@@ -82,9 +82,29 @@ The system produces two parallel results:
 1. Filename Detection Result
 Each filename → Malicious or Clean
 Based on DFA pattern matching
+Includes confusion matrix (TP, FP, TN, FN)
+Precision, Recall, and F1 Score metrics
+Sample filenames for TP/FN cases
 2. Protocol Validation Result
 Each handshake → Valid or Invalid
 Based on PDA stack behavior
+Includes confusion matrix and accuracy metrics
+
+9. Interactive File Scanning (Web Interface)
+The system provides a web-based interface for real-time file scanning:
+- Upload multiple files for batch processing
+- Real-time terminal output showing:
+  - State transitions (q0 → q1 → q2...)
+  - Pattern matching results
+  - File-by-file processing status
+- Progressive graph visualization:
+  - DFA states light up as they're visited
+  - Color coding: Blue (safe), Yellow/Orange (medium risk), Red (high risk)
+  - Shows the execution path through the automaton
+- File processing indicator:
+  - Displays current file being analyzed
+  - Shows progress (X/Y files processed)
+  - Indicates detection status and matched pattern
 
 DIAGRAM
 Dataset (Suspicious Filenames)
@@ -94,6 +114,8 @@ Regular Expressions (malicious patterns)
 Convert to Regular Grammar → Build DFA
             ↓
 DFA scans filenames → Malicious / Benign
+            ↓
+Output: Confusion Matrix, Precision, Recall, F1 Score
 
 Network Packet Stream
             ↓
@@ -102,6 +124,23 @@ Context-Free Grammar of Handshake
 Build PDA with Stack
             ↓
 PDA validates handshake → Valid / Invalid
+            ↓
+Output: Confusion Matrix, Validation Accuracy
+
+WEB INTERFACE FLOW
+User uploads files
+            ↓
+C++ DFA Module processes files
+            ↓
+Real-time output streams to frontend
+            ↓
+Terminal shows state transitions
+            ↓
+Graph visualization highlights visited states
+            ↓
+File indicator shows current processing status
+            ↓
+Final summary with detection results
 
 
 

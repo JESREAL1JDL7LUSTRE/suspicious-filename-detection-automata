@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 
 interface TerminalProps {
   output: string[]
@@ -150,52 +150,14 @@ function getColorClass(parsed: ParsedLine): string {
   }
 }
 
-interface TypingLineProps {
-  text: string
-  delay: number
-  onComplete?: () => void
-}
-
-function TypingLine({ text, delay, onComplete }: TypingLineProps) {
-  const [displayedText, setDisplayedText] = useState('')
-  const currentIndexRef = useRef(0)
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    // Reset when text changes
-    setDisplayedText('')
-    currentIndexRef.current = 0
-    
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
-    }
-
-    const typeNextChar = () => {
-      if (currentIndexRef.current < text.length) {
-        setDisplayedText(text.substring(0, currentIndexRef.current + 1))
-        currentIndexRef.current++
-        timeoutRef.current = setTimeout(typeNextChar, delay)
-      } else if (onComplete) {
-        onComplete()
-      }
-    }
-    
-    if (text.length > 0) {
-      timeoutRef.current = setTimeout(typeNextChar, delay)
-    }
-    
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
-    }
-  }, [text, delay, onComplete])
-
-  return <span>{displayedText}</span>
-}
-
 export function Terminal({ output, isRunning, scanMode = false }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null)
+  const [autoScroll, setAutoScroll] = useState(true)
+  const prevOutputLengthRef = useRef<number>(0)
+  const hasInitializedRef = useRef<boolean>(false)
+  const isUserScrollingRef = useRef<boolean>(false)
+  const scrollAnimationFrameRef = useRef<number | null>(null)
+  const isProgrammaticScrollRef = useRef<boolean>(false)
   
   // Filter output in scan mode to show only file processing details
   const filteredOutput = scanMode && isRunning
@@ -213,12 +175,221 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
       })
     : output
 
-  // Auto-scroll to bottom when new output arrives
-  useEffect(() => {
-    if (terminalRef.current) {
-      terminalRef.current.scrollTop = terminalRef.current.scrollHeight
+  // Custom smooth scroll function with configurable duration
+  const smoothScrollToBottom = useCallback((duration: number = 500) => {
+    if (!terminalRef.current || isUserScrollingRef.current) return
+    
+    // Cancel any existing scroll animation
+    if (scrollAnimationFrameRef.current !== null) {
+      cancelAnimationFrame(scrollAnimationFrameRef.current)
+      scrollAnimationFrameRef.current = null
     }
-  }, [filteredOutput])
+    
+    const container = terminalRef.current
+    const start = container.scrollTop
+    const target = container.scrollHeight - container.clientHeight
+    const distance = target - start
+    
+    // If already at bottom or very close, don't scroll
+    if (Math.abs(distance) < 10) return
+    
+    // Mark that we're doing programmatic scrolling
+    isProgrammaticScrollRef.current = true
+    
+    const startTime = performance.now()
+    
+    const animateScroll = (currentTime: number) => {
+      // Check if auto-scroll was disabled or user is scrolling
+      if (!autoScroll || isUserScrollingRef.current || !terminalRef.current) {
+        scrollAnimationFrameRef.current = null
+        isProgrammaticScrollRef.current = false
+        return
+      }
+      
+      const elapsed = currentTime - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      
+      // Use linear easing for very slow scrolls to make it more readable
+      // For very long durations, linear is better than ease-out
+      const easing = duration > 10000 
+        ? progress // Linear for very slow scrolls
+        : 1 - Math.pow(1 - progress, 3) // Ease-out for faster scrolls
+      
+      if (terminalRef.current) {
+        const newScrollTop = start + distance * easing
+        terminalRef.current.scrollTop = newScrollTop
+      }
+      
+      if (progress < 1) {
+        scrollAnimationFrameRef.current = requestAnimationFrame(animateScroll)
+      } else {
+        scrollAnimationFrameRef.current = null
+        // Reset programmatic scroll flag after a short delay
+        setTimeout(() => {
+          isProgrammaticScrollRef.current = false
+        }, 100)
+      }
+    }
+    
+    scrollAnimationFrameRef.current = requestAnimationFrame(animateScroll)
+  }, [autoScroll])
+
+  // Auto-scroll to bottom when new output arrives (only if auto-scroll is enabled)
+  useEffect(() => {
+    const currentLength = filteredOutput.length
+    const hasNewContent = currentLength > prevOutputLengthRef.current
+    
+    if (hasNewContent) {
+      prevOutputLengthRef.current = currentLength
+    }
+    
+    if (terminalRef.current && autoScroll && hasNewContent && !isUserScrollingRef.current) {
+      // Use smooth scrolling behavior for new content
+      const scrollToBottom = () => {
+        if (terminalRef.current && !isUserScrollingRef.current) {
+          const container = terminalRef.current
+          // Always use smooth scroll for auto-scroll
+          container.scrollTo({
+            top: container.scrollHeight,
+            behavior: 'smooth'
+          })
+        }
+      }
+      
+      // Wait for DOM to update, then scroll smoothly
+      const timeoutId = setTimeout(scrollToBottom, 50)
+      return () => clearTimeout(timeoutId)
+    } else if (hasNewContent) {
+      prevOutputLengthRef.current = currentLength
+    }
+  }, [filteredOutput, autoScroll])
+
+  // Scroll to bottom when auto-scroll is enabled (even if content already exists)
+  // This handles: initial mount with content, or toggling auto-scroll on
+  const prevAutoScrollRef = useRef<boolean>(autoScroll)
+  useEffect(() => {
+    // Only scroll if auto-scroll was just enabled (changed from false to true) or on initial mount
+    const wasJustEnabled = !prevAutoScrollRef.current && autoScroll
+    const isInitialMount = !hasInitializedRef.current && autoScroll && filteredOutput.length > 0
+    
+    if (isInitialMount) {
+      hasInitializedRef.current = true
+    }
+    
+    prevAutoScrollRef.current = autoScroll
+    
+    if (terminalRef.current && (wasJustEnabled || isInitialMount) && filteredOutput.length > 0 && !isUserScrollingRef.current) {
+      const scrollToBottomSmooth = () => {
+        if (terminalRef.current && !isUserScrollingRef.current) {
+          const container = terminalRef.current
+          const { scrollTop, scrollHeight, clientHeight } = container
+          const isAtBottom = scrollHeight - scrollTop - clientHeight < 10
+          
+          // Only scroll if not already at bottom
+          if (!isAtBottom) {
+            // Use very slow custom scroll for existing content (300000ms = 5 minutes)
+            // This allows users to read the content clearly as it scrolls
+            smoothScrollToBottom(600000)
+          }
+        }
+      }
+      
+      // Scroll smoothly when auto-scroll is toggled on or on initial mount
+      // Use a delay to ensure DOM is ready
+      const timeoutId = setTimeout(scrollToBottomSmooth, 100)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [autoScroll, filteredOutput.length])
+  
+  // Also check if user manually scrolled up (disable auto-scroll if they did)
+  useEffect(() => {
+    let scrollTimeout: ReturnType<typeof setTimeout> | null = null
+    
+    const handleScroll = () => {
+      // Ignore scroll events from programmatic scrolling
+      if (isProgrammaticScrollRef.current) {
+        return
+      }
+      
+      // Mark that user is scrolling
+      isUserScrollingRef.current = true
+      
+      // Clear any existing timeout
+      if (scrollTimeout) {
+        clearTimeout(scrollTimeout)
+      }
+      
+      // Reset the flag after scrolling stops
+      scrollTimeout = setTimeout(() => {
+        isUserScrollingRef.current = false
+      }, 150)
+      
+      if (terminalRef.current && autoScroll) {
+        const { scrollTop, scrollHeight, clientHeight } = terminalRef.current
+        const isNearBottom = scrollHeight - scrollTop - clientHeight < 50 // 50px threshold
+        // If user scrolled away from bottom, disable auto-scroll
+        if (!isNearBottom) {
+          setAutoScroll(false)
+        }
+      }
+    }
+    
+    const terminal = terminalRef.current
+    if (terminal) {
+      terminal.addEventListener('scroll', handleScroll, { passive: true })
+      return () => {
+        terminal.removeEventListener('scroll', handleScroll)
+        if (scrollTimeout) {
+          clearTimeout(scrollTimeout)
+        }
+      }
+    }
+  }, [autoScroll])
+
+  // Scroll functions
+  const scrollToTop = () => {
+    if (terminalRef.current) {
+      terminalRef.current.scrollTop = 0
+    }
+  }
+
+  const scrollToBottom = () => {
+    if (terminalRef.current) {
+      // Use instant scroll for manual "Down" button
+      const container = terminalRef.current
+      const lastChild = container.lastElementChild
+      if (lastChild) {
+        lastChild.scrollIntoView({ behavior: 'auto', block: 'end' })
+      } else {
+        container.scrollTop = container.scrollHeight
+      }
+    }
+  }
+
+  const toggleAutoScroll = () => {
+    const newAutoScroll = !autoScroll
+    
+    // If disabling auto-scroll, cancel any ongoing scroll animation
+    if (!newAutoScroll) {
+      if (scrollAnimationFrameRef.current !== null) {
+        cancelAnimationFrame(scrollAnimationFrameRef.current)
+        scrollAnimationFrameRef.current = null
+      }
+    }
+    
+    setAutoScroll(newAutoScroll)
+    
+    // If enabling auto-scroll, scroll to bottom smoothly with slower speed for existing content
+    if (newAutoScroll && terminalRef.current && !isUserScrollingRef.current) {
+      setTimeout(() => {
+        if (terminalRef.current && !isUserScrollingRef.current && autoScroll) {
+          // Use very slow custom scroll for existing content (600000ms = 10 minutes)
+          // This allows users to read the content clearly as it scrolls
+          smoothScrollToBottom(600000)
+        }
+      }, 100)
+    }
+  }
 
   return (
     <div className="custom-scroll-bar min-h-screen max-h-screen flex flex-col bg-gray-900 text-green-400 font-mono text-sm rounded-lg border border-gray-700">
@@ -229,12 +400,40 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
           <div className="w-3 h-3 rounded-full bg-green-500"></div>
           <span className="ml-2 text-gray-400 text-xs">Terminal</span>
         </div>
-        {isRunning && (
-          <div className="flex items-center gap-2 text-xs text-yellow-400">
-            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-            Running...
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Scroll control buttons */}
+          <button
+            onClick={scrollToTop}
+            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+            title="Scroll to top"
+          >
+            Top
+          </button>
+          <button
+            onClick={scrollToBottom}
+            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+            title="Scroll to bottom"
+          >
+            Down
+          </button>
+          <button
+            onClick={toggleAutoScroll}
+            className={`px-2 py-1 text-xs rounded transition-colors ${
+              autoScroll
+                ? 'bg-green-600 hover:bg-green-700 text-white'
+                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+            }`}
+            title={autoScroll ? 'Auto-scroll enabled' : 'Auto-scroll disabled'}
+          >
+            Auto Scroll
+          </button>
+          {isRunning && (
+            <div className="flex items-center gap-2 text-xs text-yellow-400 ml-2">
+              <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+              Running...
+            </div>
+          )}
+        </div>
       </div>
       <div
         ref={terminalRef}
