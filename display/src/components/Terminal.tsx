@@ -205,7 +205,6 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
     : output
 
   // Filter out unwanted sections and their content
-  let inUnwantedSection = false
   const unwantedSections = [
     '[TEST DATASET LABELS]',
     '[CONTEXT-FREE PROPERTY]',
@@ -214,15 +213,16 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
     '[EDGE-CASE BEHAVIOR]'
   ]
   
+  let inUnwantedSection = false
   filteredOutput = filteredOutput.filter((line) => {
     const trimmed = line.trim()
     
     // Check if this line is an unwanted section header (exact match or contains the section name)
-    const isUnwantedSection = unwantedSections.some(section => 
-      trimmed === section || trimmed.includes(section.replace(/[\[\]]/g, ''))
+    const isUnwantedSectionHeader = unwantedSections.some(section => 
+      trimmed === section || trimmed.includes(section.replace(/[[\]]/g, ''))
     )
     
-    if (isUnwantedSection) {
+    if (isUnwantedSectionHeader) {
       inUnwantedSection = true
       return false
     }
@@ -231,7 +231,7 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
     // Section headers are lines that start with [ and end with ]
     if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
       const isUnwanted = unwantedSections.some(section => 
-        trimmed === section || trimmed.includes(section.replace(/[\[\]]/g, ''))
+        trimmed === section || trimmed.includes(section.replace(/[[\]]/g, ''))
       )
       if (isUnwanted) {
         inUnwantedSection = true
@@ -413,7 +413,7 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
       const timeoutId = setTimeout(scrollToBottomSmooth, 100)
       return () => clearTimeout(timeoutId)
     }
-  }, [autoScroll, filteredOutput.length])
+  }, [autoScroll, filteredOutput.length, smoothScrollToBottom])
   
   // Also check if user manually scrolled up (disable auto-scroll if they did)
   useEffect(() => {
