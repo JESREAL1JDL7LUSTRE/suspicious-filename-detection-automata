@@ -119,10 +119,7 @@ struct DFAMetrics {
     int total_nfa_states;
     int total_dfa_states_before_min;
     int total_dfa_states_after_min;
-    int total_dfa_states_after_iga;
     double state_reduction_min_percent;
-    double state_reduction_iga_percent;
-    double total_reduction_percent;
     int filenames_tested;
     int true_positives;
     int false_positives;
@@ -131,7 +128,7 @@ struct DFAMetrics {
     double avg_matching_time_ms;
     double total_execution_time_ms;
     int estimated_memory_kb;
-    DFAMetrics() : total_patterns(0), total_nfa_states(0), total_dfa_states_before_min(0), total_dfa_states_after_min(0), total_dfa_states_after_iga(0), state_reduction_min_percent(0), state_reduction_iga_percent(0), total_reduction_percent(0), filenames_tested(0), true_positives(0), false_positives(0), false_negatives(0), detection_accuracy(0), avg_matching_time_ms(0), total_execution_time_ms(0), estimated_memory_kb(0) {}
+    DFAMetrics() : total_patterns(0), total_nfa_states(0), total_dfa_states_before_min(0), total_dfa_states_after_min(0), state_reduction_min_percent(0), filenames_tested(0), true_positives(0), false_positives(0), false_negatives(0), detection_accuracy(0), avg_matching_time_ms(0), total_execution_time_ms(0), estimated_memory_kb(0) {}
 };
 
 struct PDAMetrics {

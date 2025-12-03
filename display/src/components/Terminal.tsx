@@ -204,6 +204,7 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
       })
     : output
 
+
   // Filter out unwanted sections and their content
   const unwantedSections = [
     '[TEST DATASET LABELS]',
@@ -290,7 +291,7 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
   }
 
   // Custom smooth scroll function with configurable duration
-  const smoothScrollToBottom = useCallback((duration: number = 500) => {
+  const smoothScrollToBottom = useCallback((duration: number = 250) => {
     if (!terminalRef.current || isUserScrollingRef.current) return
     
     // Cancel any existing scroll animation
@@ -324,7 +325,6 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
       const progress = Math.min(elapsed / duration, 1)
       
       // Use linear easing for very slow scrolls to make it more readable
-      // For very long durations, linear is better than ease-out
       const easing = duration > 10000 
         ? progress // Linear for very slow scrolls
         : 1 - Math.pow(1 - progress, 3) // Ease-out for faster scrolls
@@ -401,9 +401,8 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
           
           // Only scroll if not already at bottom
           if (!isAtBottom) {
-            // Use very slow custom scroll for existing content (300000ms = 5 minutes)
-            // This allows users to read the content clearly as it scrolls
-            smoothScrollToBottom(600000)
+            // Faster scroll for readability
+            smoothScrollToBottom(2000)
           }
         }
       }
@@ -497,9 +496,8 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
     if (newAutoScroll && terminalRef.current && !isUserScrollingRef.current) {
       setTimeout(() => {
         if (terminalRef.current && !isUserScrollingRef.current && autoScroll) {
-          // Use very slow custom scroll for existing content (600000ms = 10 minutes)
-          // This allows users to read the content clearly as it scrolls
-          smoothScrollToBottom(600000)
+          // Faster scroll for readability
+          smoothScrollToBottom(2000)
         }
       }, 100)
     }

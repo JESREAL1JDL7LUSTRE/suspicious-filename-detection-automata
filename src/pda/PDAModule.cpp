@@ -8,6 +8,7 @@
 #include <fstream>
 #include <chrono>
 #include <sstream>
+// restore original includes only
 
 namespace CS311 {
 
@@ -72,6 +73,31 @@ void PDAModule::buildPDA() {
     
     std::cout << "\n[SUCCESS] PDA constructed from CFG" << std::endl;
     std::cout << std::endl;
+}
+
+void PDAModule::printCFG() {
+    std::cout << "\n[CFG — Canonical Form]" << std::endl;
+    std::cout << "V = { S, A, B, C }" << std::endl;
+    std::cout << "Σ = { SYN, SYN-ACK, ACK, DATA, FIN, RST }" << std::endl;
+    std::cout << "S = S" << std::endl;
+    std::cout << "P = {" << std::endl;
+    std::cout << "  S → SYN A," << std::endl;
+    std::cout << "  A → SYN-ACK B," << std::endl;
+    std::cout << "  B → ACK C," << std::endl;
+    std::cout << "  C → DATA C | FIN | ε" << std::endl;
+    std::cout << "}" << std::endl;
+}
+
+void PDAModule::exportPDAConstruction(const std::string& outPath) {
+    std::ofstream out(outPath);
+    if (!out.is_open()) return;
+    out << "# PDA Construction from CFG (rule-driven stack ops)\n";
+    out << "# Rules: S→SYN A, A→SYN-ACK B, B→ACK C, C→DATA C | FIN | ε\n\n";
+    out << "push(SYN)   # S→SYN A\n";
+    out << "push(SYN-ACK) # A→SYN-ACK B\n";
+    out << "pop(SYN-ACK), pop(SYN) # B→ACK C (ACK observed)\n";
+    out << "# In C: DATA keeps C (no stack change), FIN accepts (stack empty required)\n";
+    out.close();
 }
 
 bool PDAModule::processPacket(const std::string& packet, std::vector<std::string>& operations) {
@@ -258,7 +284,7 @@ void PDAModule::generateReport() {
     std::cout << "║          PDA MODULE - VALIDATION RESULTS                  ║" << std::endl;
     std::cout << "╚═══════════════════════════════════════════════════════════╝" << std::endl;
     
-    // Show sample TCP trace results
+    // Show sample TCP trace results (original style)
     std::cout << "\n[SAMPLE TCP TRACE RESULTS (RANDOMIZED)]" << std::endl;
     int sample_count = 0;
     for (const auto& t : dataset) {
