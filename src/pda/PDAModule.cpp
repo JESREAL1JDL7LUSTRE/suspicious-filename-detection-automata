@@ -72,12 +72,7 @@ void PDAModule::buildPDA() {
     std::cout << "  PUSH SYN:      On receiving SYN in q0" << std::endl;
     std::cout << "  PUSH SYN-ACK:  On receiving SYN-ACK in q1" << std::endl;
     std::cout << "  POP ALL:       On receiving ACK in q2 (pops both SYN-ACK and SYN)" << std::endl;
-    std::cout << "  Stack empty:   Required for acceptance (state-based + empty stack)" << std::endl;
-    std::cout << "\n[Academic Note] Acceptance condition requires q3 (accepting state)" << std::endl;
-    std::cout << "  and an empty stack; this aligns with standard PDA acceptance." << std::endl;
-    std::cout << "\n[NOTE] Both SYN and SYN-ACK are pushed to visualize stack depth" << std::endl;
-    std::cout << "  for pedagogical purposes. In production, only SYN might be pushed," << std::endl;
-    std::cout << "  with transitions checking SYN-ACK before popping on ACK." << std::endl;
+    std::cout << "  Stack empty:   Required for acceptance (state-based + empty stack)" << std::endl;  
     
     std::cout << "\n[SUCCESS] PDA constructed from CFG" << std::endl;
     std::cout << std::endl;
