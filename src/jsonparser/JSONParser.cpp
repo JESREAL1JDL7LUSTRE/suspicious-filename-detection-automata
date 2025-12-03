@@ -21,8 +21,23 @@ FilenameEntry JSONParser::parseFilenameEntrySimple(const std::string& line) {
     entry.technique = extractString(line, "technique");
     entry.category = extractString(line, "category");
     entry.detected_by = extractString(line, "detected_by");
-    // default malicious true
-    entry.is_malicious = true;
+    // Parse explicit ground truth label: is_malicious (true/false)
+    // Default to false if field is present and set to false, otherwise true only if explicitly true
+    // This keeps academic metrics (TP/FP/FN) meaningful.
+    size_t posMal = line.find("\"is_malicious\"");
+    if (posMal != std::string::npos) {
+        size_t colon = line.find(':', posMal);
+        if (colon != std::string::npos) {
+            size_t start = line.find_first_not_of(" \t", colon + 1);
+            if (start != std::string::npos) {
+                if (line.compare(start, 4, "true") == 0) entry.is_malicious = true;
+                else entry.is_malicious = false;
+            }
+        }
+    } else {
+        // If label absent, conservatively treat as benign to avoid inflating TP
+        entry.is_malicious = false;
+    }
     return entry;
 }
 

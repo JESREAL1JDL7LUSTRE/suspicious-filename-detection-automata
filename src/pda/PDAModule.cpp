@@ -28,10 +28,10 @@ void PDAModule::defineCFG() {
     std::cout << "║  CONTEXT-FREE GRAMMAR (Type-2 Chomsky Hierarchy)       ║" << std::endl;
     std::cout << "╚════════════════════════════════════════════════════════╝" << std::endl;
     
-    std::cout << "\nProduction Rules:" << std::endl;
-    std::cout << "  S  → SYN A                (Start with SYN)" << std::endl;
-    std::cout << "  A  → SYN-ACK B            (Must respond with SYN-ACK)" << std::endl;
-    std::cout << "  B  → ACK C                (Complete handshake with ACK)" << std::endl;
+    std::cout << "\nMinimal Handshake Grammar:" << std::endl;
+    std::cout << "  S  → SYN SYN-ACK ACK      (3-way handshake)" << std::endl;
+    
+    std::cout << "\nPedagogical Extensions (post-handshake):" << std::endl;
     std::cout << "  C  → DATA C | FIN | ε     (Data transfer or finish)" << std::endl;
     
     std::cout << "\nTerminals: { SYN, SYN-ACK, ACK, DATA, FIN, RST }" << std::endl;
@@ -73,6 +73,8 @@ void PDAModule::buildPDA() {
     std::cout << "  PUSH SYN-ACK:  On receiving SYN-ACK in q1" << std::endl;
     std::cout << "  POP ALL:       On receiving ACK in q2 (pops both SYN-ACK and SYN)" << std::endl;
     std::cout << "  Stack empty:   Required for acceptance (state-based + empty stack)" << std::endl;
+    std::cout << "\n[Academic Note] Acceptance condition requires q3 (accepting state)" << std::endl;
+    std::cout << "  and an empty stack; this aligns with standard PDA acceptance." << std::endl;
     std::cout << "\n[NOTE] Both SYN and SYN-ACK are pushed to visualize stack depth" << std::endl;
     std::cout << "  for pedagogical purposes. In production, only SYN might be pushed," << std::endl;
     std::cout << "  with transitions checking SYN-ACK before popping on ACK." << std::endl;

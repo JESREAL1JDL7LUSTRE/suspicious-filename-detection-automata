@@ -70,8 +70,7 @@ int main(int argc, char* argv[]) {
             dfaModule.definePatterns();
             dfaModule.buildNFAs();          // Regex → NFA (Thompson's Construction)
             dfaModule.convertToDFAs();       // NFA → DFA (Subset Construction)
-            dfaModule.minimizeDFAs();        // DFA minimization (Hopcroft's)
-            dfaModule.applyIGA();            // Improved Grouping Algorithm
+            dfaModule.minimizeDFAs();        // DFA minimization
             
             // Scan the provided files (this will show file-by-file details)
             dfaModule.scanFiles(filePaths);
@@ -88,8 +87,7 @@ int main(int argc, char* argv[]) {
             dfaModule.definePatterns();
             dfaModule.buildNFAs();          // Regex → NFA (Thompson's Construction)
             dfaModule.convertToDFAs();       // NFA → DFA (Subset Construction)
-            dfaModule.minimizeDFAs();        // DFA minimization (Hopcroft's)
-            dfaModule.applyIGA();            // Improved Grouping Algorithm
+            dfaModule.minimizeDFAs();        // DFA minimization
             dfaModule.testPatterns();        // Test using actual DFAs
             dfaModule.generateReport();
         }

@@ -45,7 +45,6 @@ public:
     void buildNFAs();
     void convertToDFAs();
     void minimizeDFAs();
-    void applyIGA();
     void testPatterns();
     void generateReport();
     // Scan custom file paths using DFA modules

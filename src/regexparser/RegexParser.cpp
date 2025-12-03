@@ -22,9 +22,18 @@ NFA RegexParser::regexToNFA(const std::string& regex) {
         nfa.accepting_states.insert(s);
         return nfa;
     }
-    
-    // For simple patterns like "exe", "double", etc. - use substring matching
-    return createSimplePattern(regex);
+
+    // Minimal academic regex support:
+    // Literals, alternation '|', concatenation (implicit), '*', '+', '?', grouping '()' and end-anchoring '$'.
+    // No character classes parsing here; patterns may use simple groups like (exe|scr|bat|vbs).
+    try {
+        std::string withConcat = addConcatOperator(regex);
+        std::string postfix = infixToPostfix(withConcat);
+        return buildNFAFromPostfix(postfix);
+    } catch (const std::exception&) {
+        // Fallback to simple substring matcher for robustness
+        return createSimplePattern(regex);
+    }
 }
 
 NFA RegexParser::createSimplePattern(const std::string& pattern) {
@@ -106,6 +115,105 @@ NFA RegexParser::createWildcardNFA() {
         nfa.addTransition(s, f, c, false);
     }
     return nfa;
+}
+
+// Insert explicit concatenation operator '.' where needed
+std::string RegexParser::addConcatOperator(const std::string& regex) {
+    std::string out;
+    out.reserve(regex.size()*2);
+    auto isLiteral = [&](char c){ return !isOperator(c) && c != '(' && c != ')' && c != '$'; };
+    for (size_t i=0;i<regex.size();++i) {
+        char a = regex[i];
+        out.push_back(a);
+        if (i+1<regex.size()) {
+            char b = regex[i+1];
+            bool aConcat = (isLiteral(a) || a==')' || a=='*' || a=='+' || a=='?');
+            bool bConcat = (isLiteral(b) || b=='(');
+            if (aConcat && bConcat) out.push_back('.');
+        }
+    }
+    return out;
+}
+
+// Shunting-yard to convert infix regex to postfix
+std::string RegexParser::infixToPostfix(const std::string& regex) {
+    std::string out;
+    std::stack<char> st;
+    for (size_t i=0;i<regex.size();++i) {
+        char c = regex[i];
+        if (c == '$') {
+            // end anchor treated as special literal token '$'
+            out.push_back('$');
+            continue;
+        }
+        if (!isOperator(c) && c!='(' && c!=')') {
+            out.push_back(c);
+        } else if (c=='(') {
+            st.push(c);
+        } else if (c==')') {
+            while (!st.empty() && st.top()!='(') { out.push_back(st.top()); st.pop(); }
+            if (!st.empty()) st.pop();
+        } else {
+            while (!st.empty() && getPrecedence(st.top()) >= getPrecedence(c)) { out.push_back(st.top()); st.pop(); }
+            st.push(c);
+        }
+    }
+    while (!st.empty()) { out.push_back(st.top()); st.pop(); }
+    return out;
+}
+
+// Build NFA via Thompson's construction from postfix
+NFA RegexParser::buildNFAFromPostfix(const std::string& postfix) {
+    std::stack<NFA> st;
+    for (size_t i=0;i<postfix.size();++i) {
+        char c = postfix[i];
+        switch (c) {
+            case '|': {
+                if (st.size()<2) throw std::runtime_error("bad regex");
+                NFA b = st.top(); st.pop();
+                NFA a = st.top(); st.pop();
+                st.push(alternateNFA(a,b));
+                break;
+            }
+            case '.': {
+                if (st.size()<2) throw std::runtime_error("bad regex");
+                NFA b = st.top(); st.pop();
+                NFA a = st.top(); st.pop();
+                st.push(concatenateNFA(a,b));
+                break;
+            }
+            case '*': {
+                if (st.empty()) throw std::runtime_error("bad regex");
+                NFA a = st.top(); st.pop();
+                st.push(kleeneStarNFA(a));
+                break;
+            }
+            case '+': {
+                if (st.empty()) throw std::runtime_error("bad regex");
+                NFA a = st.top(); st.pop();
+                st.push(plusNFA(a));
+                break;
+            }
+            case '?': {
+                if (st.empty()) throw std::runtime_error("bad regex");
+                NFA a = st.top(); st.pop();
+                st.push(optionalNFA(a));
+                break;
+            }
+            case '$': {
+                // End anchor: ensure accepting only at end. Implement by adding a final epsilon to an accept state without loops.
+                // We treat '$' as a no-op here because our DFAs naturally end at input end; patterns using '$' will still behave as intended via concatenation
+                // (For stricter semantics, one could disallow trailing loops after accept.)
+                break;
+            }
+            default: {
+                st.push(createCharNFA(c));
+                break;
+            }
+        }
+    }
+    if (st.size()!=1) throw std::runtime_error("bad regex");
+    return st.top();
 }
 
 NFA RegexParser::concatenateNFA(const NFA& nfa1, const NFA& nfa2) {
