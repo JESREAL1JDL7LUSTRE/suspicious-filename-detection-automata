@@ -41,6 +41,8 @@ public:
     void loadDataset(const std::string& filepath);
     void defineCFG();          // NEW: Explicitly show the CFG
     void buildPDA();           // Build PDA from CFG
+    void printCFG();           // Canonical sets (V, Σ, P, S)
+    void exportPDAConstruction(const std::string& outPath); // Log rule-driven push/pop
     void testAllTraces();      // Test all traces
     void showStackOperations(const std::vector<std::string>& sequence);
     void generateReport();
