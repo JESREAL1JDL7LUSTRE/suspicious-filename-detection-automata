@@ -4,7 +4,6 @@ import type { Node } from 'reactflow'
 import 'reactflow/dist/style.css'
 import type { Graph } from '../parser/json'
 import type { ScanResult, VisitedState } from '../hooks/useFileScan'
-import { FileProcessingIndicator } from './FileProcessingIndicator'
 
 // Memoize nodeTypes and edgeTypes outside component to avoid React Flow warning
 const nodeTypes = {}
@@ -19,17 +18,6 @@ interface GraphVisualizationProps {
   scanResults?: ScanResult[]
   visitedStates?: VisitedState[]
   isScanMode?: boolean
-  totalFiles?: number
-}
-
-// Color mapping for status
-const getStatusColor = (status: string, severity?: string): string => {
-  if (status === 'suspicious') {
-    if (severity === 'high') return '#ef4444' // red
-    if (severity === 'medium') return '#eab308' // yellow
-    return '#f97316' // orange
-  }
-  return '#3b82f6' // blue (safe)
 }
 
 export function GraphVisualization({
@@ -40,8 +28,7 @@ export function GraphVisualization({
   isRunning,
   scanResults = [],
   visitedStates = [],
-  isScanMode = false,
-  totalFiles
+  isScanMode = false
 }: GraphVisualizationProps) {
   // Debug logging
   console.log('GraphVisualization render:', {
@@ -53,9 +40,30 @@ export function GraphVisualization({
   
   // Update node colors based on visited states - progressive coloring
   const coloredNodes = useMemo(() => {
-    // If not in scan mode, return original nodes
+    // Base style for all nodes - ensures they're always circular
+    const baseCircleStyle = {
+      borderRadius: '50%',
+      width: 80,
+      height: 80,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      transition: 'background-color 0.3s ease, border-color 0.3s ease'
+    }
+
+    // If not in scan mode, return nodes with base circular style
     if (!isScanMode) {
-      return graph.nodes
+      return graph.nodes.map((node: Node) => ({
+        ...node,
+        style: {
+          ...node.style,
+          ...baseCircleStyle,
+          backgroundColor: '#94a3b8', // slate-400
+          borderColor: '#64748b', // slate-500
+          borderWidth: 2,
+          color: '#ffffff'
+        }
+      }))
     }
 
     // Create a map of visited states with their status and severity
@@ -121,6 +129,12 @@ export function GraphVisualization({
               backgroundColor: color,
               borderColor: color,
               borderWidth: 3,
+              borderRadius: '50%',
+              width: 80,
+              height: 80,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               color: '#ffffff',
               transition: 'background-color 0.3s ease, border-color 0.3s ease, border-width 0.3s ease',
               boxShadow: '0 0 8px rgba(239, 68, 68, 0.5)'
@@ -135,6 +149,12 @@ export function GraphVisualization({
               backgroundColor: '#3b82f6', // blue
               borderColor: '#2563eb', // blue-600
               borderWidth: 3,
+              borderRadius: '50%',
+              width: 80,
+              height: 80,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               color: '#ffffff',
               transition: 'background-color 0.3s ease, border-color 0.3s ease, border-width 0.3s ease',
               boxShadow: '0 0 8px rgba(59, 130, 246, 0.5)'
@@ -151,6 +171,12 @@ export function GraphVisualization({
           backgroundColor: '#94a3b8', // slate-400 - consistent gray
           borderColor: '#64748b', // slate-500
           borderWidth: 2,
+          borderRadius: '50%',
+          width: 80,
+          height: 80,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           color: '#ffffff',
           transition: 'background-color 0.3s ease, border-color 0.3s ease'
         }
@@ -228,4 +254,3 @@ export function GraphVisualization({
     </div>
   )
 }
-
