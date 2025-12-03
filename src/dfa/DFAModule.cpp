@@ -452,22 +452,11 @@ void DFAModule::generateReport() {
     std::cout << "  Average per file:       " << metrics.avg_matching_time_ms << " ms" << std::endl;
     std::cout << "  Note: Times measured using std::chrono::high_resolution_clock" << std::endl;
     
-    std::cout << "\n[TEST DATASET LABELS]" << std::endl;
-    std::cout << "  Ground truth derived from: archive/Malicious_file_trick_detection.jsonl" << std::endl;
-    std::cout << "  Labels: 'is_malicious' field indicates ground truth (true=malicious, false=benign)" << std::endl;
-    std::cout << "  Dataset contains known malicious filename patterns and benign examples" << std::endl;
-    
     std::cout << "\n[IGA PATTERN → GROUP MAPPING]" << std::endl;
     for (size_t i = 0; i < pattern_names.size() && i < grouped_dfas.size(); ++i) {
         std::cout << "  Group " << i << ": Pattern '" << regex_patterns[i] 
                   << "' (" << pattern_names[i] << ") → DFA " << i << std::endl;
     }
-    
-    std::cout << "\n[EDGE-CASE BEHAVIOR]" << std::endl;
-    std::cout << "  Unsupported regex features (backreferences): Not supported, will fail during NFA construction" << std::endl;
-    std::cout << "  Whitelist patterns: Not implemented; all matches are treated as suspicious" << std::endl;
-    std::cout << "  Unicode tricks: Detected via additional heuristics (checkAdditionalPatterns)" << std::endl;
-    std::cout << "  Double extensions: Detected via additional heuristics" << std::endl;
     std::cout << std::endl;
 
     // Also write report to output file

@@ -8,7 +8,7 @@ interface TerminalProps {
 
 interface ParsedLine {
   text: string
-  type: 'header' | 'info' | 'success' | 'error' | 'warning' | 'table' | 'section' | 'metric' | 'normal' | 'state_transition' | 'file_processing'
+  type: 'header' | 'info' | 'success' | 'error' | 'warning' | 'table' | 'section' | 'metric' | 'normal' | 'state_transition' | 'final_state' | 'file_processing'
   stateFrom?: string
   stateTo?: string
   fileName?: string
@@ -53,14 +53,16 @@ function parseLine(line: string): ParsedLine {
   }
   
   // State transitions (q0 → q1, State: q0 → q1, q0->q1, etc.)
-  // Use alternation instead of character class to avoid range issues
-  const stateTransitionMatch = trimmed.match(/(?:State:\s*)?q?(\d+)\s*(?:→|->)\s*q?(\d+)/i)
+  // Also handle "State: → q0" format (missing from state, assume q0)
+  const stateTransitionMatch = trimmed.match(/(?:State:\s*)?(?:q?(\d+)\s*)?(?:→|->)\s*q?(\d+)/i)
   if (stateTransitionMatch) {
+    const fromState = stateTransitionMatch[1] || '0' // Default to q0 if missing
+    const toState = stateTransitionMatch[2]
     return { 
       text: line, 
       type: 'state_transition',
-      stateFrom: stateTransitionMatch[1],
-      stateTo: stateTransitionMatch[2]
+      stateFrom: fromState,
+      stateTo: toState
     }
   }
   
@@ -76,6 +78,16 @@ function parseLine(line: string): ParsedLine {
         stateFrom: fromMatch[1],
         stateTo: toMatch[1]
       }
+    }
+  }
+  
+  // Final state lines (Final state: q3)
+  const finalStateMatch = trimmed.match(/Final\s+state:\s*q?(\d+)/i)
+  if (finalStateMatch) {
+    return {
+      text: line,
+      type: 'final_state',
+      stateTo: finalStateMatch[1]
     }
   }
   
@@ -123,6 +135,22 @@ function getColorClass(parsed: ParsedLine): string {
     return `${colors[colorIndex]} font-semibold animate-pulse`
   }
   
+  // Final state coloring
+  if (type === 'final_state' && stateTo) {
+    const stateNum = parseInt(stateTo)
+    const colors = [
+      'text-blue-400',      // q0
+      'text-cyan-400',      // q1
+      'text-teal-400',      // q2
+      'text-green-400',      // q3 - accepting
+      'text-yellow-400',    // q4
+      'text-orange-400',    // q5
+      'text-red-400'        // q6+
+    ]
+    const colorIndex = Math.min(stateNum, colors.length - 1)
+    return `${colors[colorIndex]} font-bold animate-pulse`
+  }
+  
   // File processing lines
   if (type === 'file_processing') {
     return 'text-purple-300 font-semibold'
@@ -153,6 +181,7 @@ function getColorClass(parsed: ParsedLine): string {
 export function Terminal({ output, isRunning, scanMode = false }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
+  const [showAllStates, setShowAllStates] = useState(false)
   const prevOutputLengthRef = useRef<number>(0)
   const hasInitializedRef = useRef<boolean>(false)
   const isUserScrollingRef = useRef<boolean>(false)
@@ -160,7 +189,7 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
   const isProgrammaticScrollRef = useRef<boolean>(false)
   
   // Filter output in scan mode to show only file processing details
-  const filteredOutput = scanMode && isRunning
+  let filteredOutput = scanMode && isRunning
     ? output.filter((line) => {
         const trimmed = line.trim()
         const parsed = parseLine(line)
@@ -174,6 +203,91 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
         return isFileProcessing || parsed.type === 'header' || parsed.type === 'file_processing'
       })
     : output
+
+  // Filter out unwanted sections and their content
+  let inUnwantedSection = false
+  const unwantedSections = [
+    '[TEST DATASET LABELS]',
+    '[CONTEXT-FREE PROPERTY]',
+    '[KEY PROPERTY]',
+    '[KEY INSIGHT]',
+    '[EDGE-CASE BEHAVIOR]'
+  ]
+  
+  filteredOutput = filteredOutput.filter((line) => {
+    const trimmed = line.trim()
+    
+    // Check if this line is an unwanted section header (exact match or contains the section name)
+    const isUnwantedSection = unwantedSections.some(section => 
+      trimmed === section || trimmed.includes(section.replace(/[\[\]]/g, ''))
+    )
+    
+    if (isUnwantedSection) {
+      inUnwantedSection = true
+      return false
+    }
+    
+    // Check if we're entering a new section (any section header resets the flag)
+    // Section headers are lines that start with [ and end with ]
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      const isUnwanted = unwantedSections.some(section => 
+        trimmed === section || trimmed.includes(section.replace(/[\[\]]/g, ''))
+      )
+      if (isUnwanted) {
+        inUnwantedSection = true
+        return false
+      } else {
+        // This is a different section, stop filtering
+        inUnwantedSection = false
+      }
+    }
+    
+    // If we're in an unwanted section, filter out this line
+    // Also filter out lines that contain key phrases from these sections
+    if (inUnwantedSection) {
+      return false
+    }
+    
+    // Filter out lines that contain content from these sections even if section header wasn't caught
+    if (trimmed.includes('Ground truth derived from:') ||
+        trimmed.includes('Labels:') && trimmed.includes('field indicates ground truth') ||
+        trimmed.includes('Dataset contains') && (trimmed.includes('malicious filename patterns') || trimmed.includes('TCP handshake sequences')) ||
+        trimmed.includes('This is a Type-2 (Context-Free) language because:') ||
+        trimmed.includes('Requires STACK memory to track pairing') ||
+        trimmed.includes('Cannot be recognized by DFA (Type-3)') ||
+        trimmed.includes('SYN must be paired with SYN-ACK') ||
+        trimmed.includes('SYN-ACK must be paired with ACK') ||
+        trimmed.includes('Stack usage demonstrates Type-2 (CF) language:') ||
+        trimmed.includes('Stack needed to track SYN') ||
+        trimmed.includes('Cannot be recognized by finite automaton (DFA)') ||
+        trimmed.includes('Requires unbounded memory for nested structures') ||
+        trimmed.includes('Accepting condition: State-based (q3) AND empty stack') ||
+        trimmed.includes('The Chomsky Hierarchy demonstrates computational power:') ||
+        trimmed.includes('Type 3 (Regular): Fast pattern matching') ||
+        trimmed.includes('Type 2 (CF): Can handle nested/paired structures') ||
+        trimmed.includes('Security systems need BOTH for comprehensive detection')) {
+      return false
+    }
+    
+    // Filter out bullet points that are part of these sections
+    if ((trimmed.startsWith('•') || trimmed.startsWith('-')) && 
+        (trimmed.includes('Stack') || trimmed.includes('DFA') || trimmed.includes('SYN') || 
+         trimmed.includes('Chomsky') || trimmed.includes('Type 3') || trimmed.includes('Type 2') ||
+         trimmed.includes('Security systems'))) {
+      return false
+    }
+    
+    return true
+  })
+
+  // Filter state transitions: hide all when toggle is off
+  if (!showAllStates) {
+    filteredOutput = filteredOutput.filter((line) => {
+      const parsed = parseLine(line)
+      // Hide all state transitions and final states when toggle is off
+      return parsed.type !== 'state_transition' && parsed.type !== 'final_state'
+    })
+  }
 
   // Custom smooth scroll function with configurable duration
   const smoothScrollToBottom = useCallback((duration: number = 500) => {
@@ -401,6 +515,18 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
           <span className="ml-2 text-gray-400 text-xs">Terminal</span>
         </div>
         <div className="flex items-center gap-2">
+          {/* State transitions toggle */}
+          <button
+            onClick={() => setShowAllStates(!showAllStates)}
+            className={`px-2 py-1 text-xs rounded transition-colors ${
+              showAllStates
+                ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+            }`}
+            title={showAllStates ? 'Showing all state transitions' : 'Showing first 3 state transitions (click to show all)'}
+          >
+            {showAllStates ? 'All States' : 'States (3)'}
+          </button>
           {/* Scroll control buttons */}
           <button
             onClick={scrollToTop}
@@ -452,10 +578,10 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
                 className={`whitespace-pre-wrap wrap-break-word ${colorClass} ${
                   parsed.type === 'header' ? 'my-1' : ''
                 } ${parsed.type === 'section' ? 'my-0.5' : ''
-                } ${parsed.type === 'state_transition' ? 'my-1 transition-all duration-300' : ''
+                } ${parsed.type === 'state_transition' || parsed.type === 'final_state' ? 'my-1 transition-all duration-300' : ''
                 } ${parsed.type === 'file_processing' ? 'my-1' : ''}`}
                 style={{
-                  animation: parsed.type === 'state_transition' 
+                  animation: parsed.type === 'state_transition' || parsed.type === 'final_state'
                     ? 'fadeIn 0.3s ease-in' 
                     : undefined
                 }}
@@ -476,6 +602,11 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
                         {line.substring(line.indexOf('->') + 2).replace(/q\d+/i, '').trim()}
                       </span>
                     )}
+                  </>
+                ) : parsed.type === 'final_state' && parsed.stateTo ? (
+                  <>
+                    <span className="text-gray-400">Final state: </span>
+                    <span className="text-green-400 font-bold animate-pulse">q{parsed.stateTo}</span>
                   </>
                 ) : null}
                 {parsed.type === 'file_processing' && (

@@ -37,13 +37,6 @@ void PDAModule::defineCFG() {
     std::cout << "\nTerminals: { SYN, SYN-ACK, ACK, DATA, FIN, RST }" << std::endl;
     std::cout << "Non-terminals: { S, A, B, C }" << std::endl;
     std::cout << "Start symbol: S" << std::endl;
-    
-    std::cout << "\n[KEY PROPERTY]" << std::endl;
-    std::cout << "  This is a Type-2 (Context-Free) language because:" << std::endl;
-    std::cout << "  • Requires STACK memory to track pairing" << std::endl;
-    std::cout << "  • Cannot be recognized by DFA (Type-3)" << std::endl;
-    std::cout << "  • SYN must be paired with SYN-ACK" << std::endl;
-    std::cout << "  • SYN-ACK must be paired with ACK" << std::endl;
     std::cout << std::endl;
 }
 
@@ -326,18 +319,6 @@ void PDAModule::generateReport() {
     std::cout << "  Total execution time:   " << metrics.total_execution_time_ms << " ms (wall-clock)" << std::endl;
     std::cout << "  Average per trace:      " << metrics.avg_validation_time_ms << " ms" << std::endl;
     std::cout << "  Note: Times measured using std::chrono::high_resolution_clock" << std::endl;
-    
-    std::cout << "\n[TEST DATASET LABELS]" << std::endl;
-    std::cout << "  Ground truth derived from: archive/tcp_handshake_traces_expanded.jsonl" << std::endl;
-    std::cout << "  Labels: 'valid' field indicates ground truth (true=valid handshake, false=invalid)" << std::endl;
-    std::cout << "  Dataset contains valid TCP handshake sequences and invalid/malformed sequences" << std::endl;
-    
-    std::cout << "\n[CONTEXT-FREE PROPERTY]" << std::endl;
-    std::cout << "  Stack usage demonstrates Type-2 (CF) language:" << std::endl;
-    std::cout << "  • Stack needed to track SYN ↔ SYN-ACK ↔ ACK pairing" << std::endl;
-    std::cout << "  • Cannot be recognized by finite automaton (DFA)" << std::endl;
-    std::cout << "  • Requires unbounded memory for nested structures" << std::endl;
-    std::cout << "  • Accepting condition: State-based (q3) AND empty stack" << std::endl;
     std::cout << std::endl;
 
     // Also write PDA report to output file

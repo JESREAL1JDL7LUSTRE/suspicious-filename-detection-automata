@@ -301,12 +301,6 @@ int main(int argc, char* argv[]) {
     std::cout << "│ Complexity          │ O(n)             │ O(n)             │" << std::endl;
     std::cout << "└─────────────────────┴──────────────────┴──────────────────┘" << std::endl;
     
-    std::cout << "\n[KEY INSIGHT]" << std::endl;
-    std::cout << "The Chomsky Hierarchy demonstrates computational power:" << std::endl;
-    std::cout << "  • Type 3 (Regular): Fast pattern matching, no memory" << std::endl;
-    std::cout << "  • Type 2 (CF): Can handle nested/paired structures" << std::endl;
-    std::cout << "  • Security systems need BOTH for comprehensive detection" << std::endl;
-    
     std::cout << "\n[EXECUTION COMPLETE]" << std::endl;
     std::cout << "Results saved to: output/" << std::endl;
     
