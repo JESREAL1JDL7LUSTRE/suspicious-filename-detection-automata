@@ -163,12 +163,23 @@ export function useSimulator(onComplete?: () => void) {
     setHasRunSimulator(false) // Reset since we stopped it
   }, [])
 
+  const reset = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+    setTerminalOutput([])
+    setIsRunning(false)
+    setHasRunSimulator(false)
+  }, [])
+
   return {
     terminalOutput,
     isRunning,
     hasRunSimulator,
     runSimulator,
-    stopSimulator
+    stopSimulator,
+    reset
   }
 }
 

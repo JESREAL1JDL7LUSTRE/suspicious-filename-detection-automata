@@ -207,6 +207,153 @@ app.post('/api/run-simulator', async (req, res) => {
 })
 
 // Health check endpoint
+// Scan endpoint - uses C++ DFA modules for scanning
+app.post('/api/scan', async (req, res) => {
+  console.log('Received scan request')
+  
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('X-Accel-Buffering', 'no')
+  
+  const { files: filePaths } = req.body
+  
+  if (!filePaths || filePaths.length === 0) {
+    res.write(`data: ${JSON.stringify({ type: 'error', message: 'No files provided\n' })}\n\n`)
+    res.end()
+    return
+  }
+  
+  // Send initial connection message
+  res.write(`data: ${JSON.stringify({ type: 'start', message: 'Starting C++ DFA scanner...\n' })}\n\n`)
+  
+  if (res.flushHeaders) {
+    res.flushHeaders()
+  }
+  
+  // Keepalive interval
+  const keepAliveInterval = setInterval(() => {
+    try {
+      res.write(`: keepalive\n\n`)
+    } catch (e) {
+      clearInterval(keepAliveInterval)
+    }
+  }, 30000)
+  
+  try {
+    // Prepare file paths as command-line arguments
+    // Escape paths with spaces for Windows
+    const args = filePaths.map(path => {
+      if (path.includes(' ')) {
+        return `"${path}"`
+      }
+      return path
+    })
+    
+    console.log(`Spawning simulator for scan with ${args.length} files`)
+    
+    // Spawn the simulator with file paths as arguments
+    let simulator
+    if (isWindows) {
+      const quotedPath = `"${simulatorPath}"`
+      simulator = spawn(quotedPath, args, {
+        cwd: projectRoot,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: true
+      })
+    } else {
+      simulator = spawn(simulatorPath, args, {
+        cwd: projectRoot,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: false
+      })
+    }
+    
+    // Set encoding
+    if (simulator.stdout) {
+      simulator.stdout.setEncoding('utf8')
+    }
+    if (simulator.stderr) {
+      simulator.stderr.setEncoding('utf8')
+    }
+    
+    // Handle stdout
+    if (simulator.stdout) {
+      simulator.stdout.on('data', (data) => {
+        const output = data.toString('utf8')
+        try {
+          res.write(`data: ${JSON.stringify({ type: 'stdout', message: output })}\n\n`)
+        } catch (e) {
+          console.error('Error writing to response:', e)
+        }
+      })
+    }
+    
+    // Handle stderr
+    if (simulator.stderr) {
+      simulator.stderr.on('data', (data) => {
+        const output = data.toString('utf8')
+        try {
+          res.write(`data: ${JSON.stringify({ type: 'stderr', message: output })}\n\n`)
+        } catch (e) {
+          console.error('Error writing to response:', e)
+        }
+      })
+    }
+    
+    // Handle errors
+    simulator.on('error', (error) => {
+      console.error('Simulator spawn error:', error)
+      clearInterval(keepAliveInterval)
+      res.write(`data: ${JSON.stringify({ type: 'error', message: `Error: ${error.message}\n` })}\n\n`)
+      res.end()
+    })
+    
+    // Handle completion
+    simulator.on('close', (code, signal) => {
+      console.log(`Simulator scan process closed - code: ${code}, signal: ${signal}`)
+      clearInterval(keepAliveInterval)
+      try {
+        const exitMessage = code !== null 
+          ? `\nScan completed with code ${code}\n`
+          : signal 
+            ? `\nProcess terminated by signal: ${signal}\n`
+            : `\nScan completed\n`
+        res.write(`data: ${JSON.stringify({ type: 'end', code, signal, message: exitMessage })}\n\n`)
+        res.end()
+      } catch (e) {
+        console.error('Error closing response:', e)
+      }
+    })
+    
+    // Handle client disconnect
+    res.on('close', () => {
+      console.log('Response stream closed (client disconnected)')
+      clearInterval(keepAliveInterval)
+      setTimeout(() => {
+        if (simulator && !simulator.killed) {
+          console.log('Killing simulator process due to client disconnect')
+          try {
+            simulator.kill('SIGTERM')
+            setTimeout(() => {
+              if (simulator && !simulator.killed) {
+                simulator.kill('SIGKILL')
+              }
+            }, 2000)
+          } catch (e) {
+            console.error('Error killing simulator:', e)
+          }
+        }
+      }, 2000)
+    })
+    
+  } catch (error) {
+    res.write(`data: ${JSON.stringify({ type: 'error', message: `Failed to start scanner: ${error.message}\n` })}\n\n`)
+    res.end()
+  }
+})
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', simulatorPath })
 })

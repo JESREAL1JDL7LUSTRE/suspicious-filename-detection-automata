@@ -63,11 +63,19 @@ struct DFA {
         return (it != transition_table.end()) ? it->second : -1;
     }
     int getStateCount() const { return states.size(); }
-    bool accepts(const std::string& input) const {
+    bool accepts(const std::string& input, bool verbose = false) const {
         int current = start_state;
+        int prev_state = start_state;
         for (char c : input) {
+            prev_state = current;
             current = getNextState(current, c);
+            if (verbose && prev_state != -1) {
+                std::cout << "  State: q" << prev_state << " → q" << current << " (symbol: '" << c << "')" << std::endl;
+            }
             if (current == -1) return false;
+        }
+        if (verbose && current != -1) {
+            std::cout << "  Final state: q" << current << std::endl;
         }
         return accepting_states.count(current) > 0;
     }
