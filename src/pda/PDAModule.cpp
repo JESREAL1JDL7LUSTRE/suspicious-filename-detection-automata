@@ -9,6 +9,9 @@
 #include <chrono>
 #include <sstream>
 // restore original includes only
+#include <algorithm>
+#include <random>
+#include <iomanip>
 
 namespace CS311 {
 
@@ -350,24 +353,38 @@ void PDAModule::generateReport() {
     std::cout << "║          PDA MODULE - VALIDATION RESULTS                  ║" << std::endl;
     std::cout << "╚═══════════════════════════════════════════════════════════╝" << std::endl;
     
-    // Show sample TCP trace results (original style)
+    // Show sample TCP trace results (truly randomized from dataset)
     std::cout << "\n[SAMPLE TCP TRACE RESULTS (RANDOMIZED)]" << std::endl;
-    int sample_count = 0;
-    for (const auto& t : dataset) {
-        if (sample_count >= 5) break;
-        pda.reset();  // Reset PDA state before validation
-        bool result = validateSequence(t.sequence);
-        std::string validation = result ? "VALID" : "INVALID";
-        std::string reason = "";
-        if (!result && t.valid) {
-            reason = " (unexpected rejection)";
-        } else if (result && !t.valid) {
-            reason = " (unexpected acceptance)";
-        } else if (!result && !t.valid && !t.description.empty()) {
-            reason = " (" + t.description + ")";
+    {
+        const size_t K = 5;
+        std::vector<size_t> idx(dataset.size());
+        for (size_t i=0;i<idx.size();++i) idx[i]=i;
+        if (!idx.empty()) {
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::shuffle(idx.begin(), idx.end(), gen);
+            size_t sample_count = 0;
+            for (size_t j=0; j<idx.size() && sample_count<K; ++j) {
+                const auto& t = dataset[idx[j]];
+                pda.reset();
+                bool result = validateSequence(t.sequence);
+                std::string validation = result ? "VALID" : "INVALID";
+                std::string reason = "";
+                if (!result && t.valid) {
+                    reason = " (unexpected rejection)";
+                } else if (result && !t.valid) {
+                    reason = " (unexpected acceptance)";
+                } else if (!result && !t.valid && !t.description.empty()) {
+                    reason = " (" + t.description + ")";
+                }
+                std::ostringstream id;
+                id << "Trace_" << std::setw(3) << std::setfill('0') << (sample_count+1);
+                std::cout << "[" << id.str() << "] "
+                          << (t.trace_id.empty()? std::string("(no-id)") : t.trace_id)
+                          << ": " << validation << reason << std::endl;
+                sample_count++;
+            }
         }
-        std::cout << t.trace_id << ": " << validation << reason << std::endl;
-        sample_count++;
     }
     
     std::cout << "\n[VALIDATION METRICS]" << std::endl;

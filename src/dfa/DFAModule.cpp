@@ -13,6 +13,8 @@
 #include <queue>
 #include <map>
 #include <sstream>
+#include <random>
+#include <iomanip>
 // (no extra headers needed for original implementation)
 
 namespace CS311 {
@@ -575,18 +577,30 @@ void DFAModule::generateReport() {
     std::cout << "║          DFA MODULE - DETECTION RESULTS                   ║" << std::endl;
     std::cout << "╚═══════════════════════════════════════════════════════════╝" << std::endl;
     
-    // Show sample filename results (deterministic order)
+    // Show sample filename results (truly randomized from staged dataset)
     std::cout << "\n[SAMPLE FILENAME RESULTS (RANDOMIZED)]" << std::endl;
-    int sample_count = 0;
-    for (const auto& entry : dataset) {
-        if (sample_count >= 5) break;
-        std::string matched;
-        bool detected = testFilenameWithDFA(entry.filename, matched);
-        std::string result = detected ? "MALICIOUS" : "BENIGN";
-        std::string match_info = detected ? " (matched: " + matched + ")" : "";
-        std::cout << "[Sample " << (sample_count + 1) << "]  \"" << entry.filename 
-                  << "\" → " << result << match_info << std::endl;
-        sample_count++;
+    {
+        const size_t K = 5;
+        std::vector<size_t> idx(dataset.size());
+        for (size_t i=0;i<idx.size();++i) idx[i]=i;
+        if (!idx.empty()) {
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::shuffle(idx.begin(), idx.end(), gen);
+            size_t sample_count = 0;
+            for (size_t j=0; j<idx.size() && sample_count<K; ++j) {
+                const auto& entry = dataset[idx[j]];
+                std::string matched;
+                bool detected = testFilenameWithDFA(entry.filename, matched);
+                std::string result = detected ? "MALICIOUS" : "BENIGN";
+                std::string match_info = detected ? " (matched: " + matched + ")" : "";
+                std::ostringstream id;
+                id << "File_" << std::setw(3) << std::setfill('0') << (sample_count+1);
+                std::cout << "[" << id.str() << "]  \"" << entry.filename
+                          << "\" → " << result << match_info << std::endl;
+                sample_count++;
+            }
+        }
     }
     
     // Calculate confusion matrix metrics (micro-average)
@@ -913,20 +927,33 @@ void DFAModule::generateScanReport(const std::vector<std::string>& filePaths,
         }
     }
     
-    // Show sample results
+    // Show sample results (randomized from scanned files)
     std::cout << "\n[SAMPLE FILENAME RESULTS (RANDOMIZED)]" << std::endl;
-    int sample_count = 0;
-    for (size_t i = 0; i < filePaths.size() && sample_count < 5; ++i) {
-        std::string fileName = filePaths[i];
-        size_t lastSlash = filePaths[i].find_last_of("/\\");
-        if (lastSlash != std::string::npos) {
-            fileName = filePaths[i].substr(lastSlash + 1);
+    {
+        const size_t K = 5;
+        std::vector<size_t> idx(filePaths.size());
+        for (size_t i=0;i<idx.size();++i) idx[i]=i;
+        if (!idx.empty()) {
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::shuffle(idx.begin(), idx.end(), gen);
+            size_t sample_count = 0;
+            for (size_t t=0; t<idx.size() && sample_count<K; ++t) {
+                size_t i = idx[t];
+                std::string fileName = filePaths[i];
+                size_t lastSlash = filePaths[i].find_last_of("/\\");
+                if (lastSlash != std::string::npos) {
+                    fileName = filePaths[i].substr(lastSlash + 1);
+                }
+                std::string result = detected[i] ? "MALICIOUS" : "BENIGN";
+                std::string match_info = detected[i] ? " (matched: " + matched_patterns[i] + ")" : "";
+                std::ostringstream id;
+                id << "File_" << std::setw(3) << std::setfill('0') << (sample_count+1);
+                std::cout << "[" << id.str() << "]  \"" << fileName
+                          << "\" → " << result << match_info << std::endl;
+                sample_count++;
+            }
         }
-        std::string result = detected[i] ? "MALICIOUS" : "BENIGN";
-        std::string match_info = detected[i] ? " (matched: " + matched_patterns[i] + ")" : "";
-        std::cout << "[Sample " << (sample_count + 1) << "]  \"" << fileName 
-                  << "\" → " << result << match_info << std::endl;
-        sample_count++;
     }
     
     std::cout << "\n╔═══════════════════════════════════════════════════════════╗" << std::endl;
