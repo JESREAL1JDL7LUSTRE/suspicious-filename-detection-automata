@@ -113,14 +113,29 @@ export function useFileScan(onComplete?: (results: ScanResult[]) => void) {
                     // Split message by newlines to handle multi-line messages
                     const lines = message.split(/\r?\n/)
                     
+                    // Debug: log ALL messages in scan mode to see what we're receiving
+                    if (isScanning) {
+                      console.log('📥 Received message in scan mode:', {
+                        type: data.type,
+                        messageLength: message.length,
+                        messagePreview: message.substring(0, 200),
+                        hasState: message.includes('State:'),
+                        hasFinalState: message.includes('Final state'),
+                        linesCount: lines.length
+                      })
+                    }
+                    
                     // Debug: log if message contains state transitions
                     if (message.includes('State:') || message.includes('Final state')) {
                       console.log('📦 Message contains state transitions, splitting into', lines.length, 'lines')
-                      console.log('📦 Sample lines:', lines.slice(0, 3).map(l => l.substring(0, 50)))
+                      console.log('📦 Sample lines:', lines.slice(0, 5).map(l => l.substring(0, 80)))
+                      console.log('📦 Full message:', message)
                     }
                     
                     // Parse each line individually
                     for (const line of lines) {
+                      // Skip empty lines
+                      if (!line.trim()) continue
                       // Parse C++ output to extract scan results
                       // Look for lines like: "[1/32] Analyzing: filename" and "✓ Result: SUSPICIOUS/SAFE"
                       const analyzingMatch = line.match(/\[(\d+)\/(\d+)\]\s*Analyzing:\s*([^\n\r]+)/i)

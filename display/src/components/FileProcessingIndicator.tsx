@@ -37,6 +37,15 @@ export function FileProcessingIndicator({
     // Each chunk might be a full line or part of a line
     const allText = terminalOutput.join('')
     
+    // Debug: log terminal output to see what we're parsing (only in development)
+    if (terminalOutput.length > 0 && isScanning && import.meta.env.DEV) {
+      console.log('FileProcessingIndicator - Terminal output chunks:', terminalOutput.length)
+      const lastChunk = terminalOutput[terminalOutput.length - 1]
+      if (lastChunk) {
+        console.log('FileProcessingIndicator - Last chunk:', lastChunk.substring(0, 200))
+      }
+    }
+    
     // Try multiple regex patterns to catch the file name
     // Pattern 1: Complete line with filename on same line - most common format
     // Matches: "[1/32] Analyzing: filename" or "[1/32] Analyzing: filename\n"
