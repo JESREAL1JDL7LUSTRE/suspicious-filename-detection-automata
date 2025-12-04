@@ -36,7 +36,9 @@ private:
     
     // NEW: Actually use DFAs for testing
     bool testFilenameWithDFA(const std::string& filename, std::string& matched_pattern);
+    bool testFilenameWithDFAVerbose(const std::string& filename, std::string& matched_pattern);
     bool runDFA(const DFA& dfa, const std::string& input);
+    bool runDFAVerbose(const DFA& dfa, const std::string& input);
     bool checkAdditionalPatterns(const std::string& filename, std::string& matched_pattern);
     // Tokenization discipline: current DFA is per-character; helper to expose alphabet
     std::set<char> getAlphabetUnion() const;

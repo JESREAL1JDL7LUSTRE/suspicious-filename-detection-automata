@@ -378,11 +378,35 @@ bool DFAModule::testFilenameWithDFA(const std::string& filename, std::string& ma
     return checkAdditionalPatterns(filename, matched_pattern);
 }
 
+// Test filename with DFA using verbose mode (for file scanning visualization)
+bool DFAModule::testFilenameWithDFAVerbose(const std::string& filename, std::string& matched_pattern) {
+    // Convert to lowercase for case-insensitive matching
+    std::string lower = filename;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    
+    // Test against all DFAs with verbose state transitions
+    for (size_t i = 0; i < minimized_dfas.size() && i < pattern_names.size(); i++) {
+        if (runDFAVerbose(minimized_dfas[i], lower)) {
+            matched_pattern = pattern_names[i];
+            return true;
+        }
+    }
+    
+    // Additional heuristics for patterns DFAs might miss
+    return checkAdditionalPatterns(filename, matched_pattern);
+}
+
 // Run a DFA on input string
 bool DFAModule::runDFA(const DFA& dfa, const std::string& input) {
     // Default verbose mode OFF to avoid measurement bias on performance metrics
     // Verbose mode can be enabled via frontend toggle
     return dfa.accepts(input, false);
+}
+
+// Run a DFA on input string with verbose state transitions (for file scanning visualization)
+bool DFAModule::runDFAVerbose(const DFA& dfa, const std::string& input) {
+    // Verbose mode ON for file scanning to enable progressive state coloring
+    return dfa.accepts(input, true);
 }
 
 // Additional pattern checks (for comprehensive detection)
@@ -712,7 +736,8 @@ void DFAModule::scanFiles(const std::vector<std::string>& filePaths) {
         std::string matched;
         std::cout << "  → Running DFA simulation..." << std::endl;
         std::cout.flush();
-        bool isDetected = testFilenameWithDFA(fileName, matched);
+        // Use verbose mode for file scanning to enable progressive state coloring
+        bool isDetected = testFilenameWithDFAVerbose(fileName, matched);
         
         detected.push_back(isDetected);
         matched_patterns.push_back(matched);
