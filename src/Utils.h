@@ -66,9 +66,38 @@ struct DFA {
     bool accepts(const std::string& input, bool verbose = false) const {
         int current = start_state;
         int prev_state = start_state;
+        
+        // SOUNDNESS CHECK: Verify start_state is valid
+        if (start_state < 0 || start_state >= (int)states.size()) {
+            std::cerr << "[INVARIANT VIOLATION] Invalid start state: " << start_state 
+                     << " (valid range: 0-" << (states.size()-1) << ")" << std::endl;
+            return false;
+        }
+        
         for (char c : input) {
             prev_state = current;
             current = getNextState(current, c);
+            
+            // SOUNDNESS CHECK: Verify current state is in Q (set of states)
+            if (current != -1) {
+                bool state_exists = false;
+                for (const auto& s : states) {
+                    if (s.id == current) {
+                        state_exists = true;
+                        break;
+                    }
+                }
+                if (!state_exists) {
+                    std::cerr << "[INVARIANT VIOLATION] Current state " << current 
+                             << " not in Q. Valid states: ";
+                    for (const auto& s : states) {
+                        std::cerr << s.id << " ";
+                    }
+                    std::cerr << std::endl;
+                    return false;
+                }
+            }
+            
             if (verbose && prev_state != -1) {
                 std::cout << "  State: q" << prev_state << " → q" << current << " (symbol: '" << c << "')" << std::endl;
                 std::cout.flush(); // Flush immediately so frontend receives it in real-time

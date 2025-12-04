@@ -205,24 +205,38 @@ int main(int argc, char* argv[]) {
 
     // After modules have been built and reports generated, write separate DOT files
     try {
-        // Write one DOT file per DFA
+        // Write one DOT file per minimized DFA with proper naming
         size_t dfaCount = dfaModule.getDfaCount();
+        const auto& patternNames = dfaModule.getPatternNames();
+        const auto& regexPatterns = dfaModule.getRegexPatterns();
+        
         for (size_t i = 0; i < dfaCount; ++i) {
             std::ostringstream dot;
+            
+            // ARTIFACT NAMING: Include pattern name and alphabet in headers
+            std::string patternName = (i < patternNames.size()) ? patternNames[i] : ("pattern_" + std::to_string(i));
+            std::string regexPattern = (i < regexPatterns.size()) ? regexPatterns[i] : "";
+            
+            dot << "// Minimized DFA for pattern: " << patternName << "\n";
+            dot << "// Regex: " << regexPattern << "\n";
+            dot << "// Alphabet: Printable ASCII (32-126) - per-character tokenization\n";
+            dot << "// Tokenization: Per-character (not per-lexeme)\n";
             dot << "digraph G {\n";
             dot << "  rankdir=LR;\n";
+            dot << "  label=\"DFA for " << patternName << " (regex: " << regexPattern << ")\";\n";
             dot << dfaModule.exportGraphvizFor(i) << "\n";
             dot << "  start [shape=Mdiamond];\n";
             dot << "  end [shape=Msquare];\n";
             dot << "  start -> d" << i << "_s0;\n";
             dot << "}\n";
 
-            std::string path = "output/dfa_" + std::to_string(i) + ".dot";
+            // ARTIFACT NAMING: Save as dfa_min_i.dot
+            std::string path = "output/dfa_min_" + std::to_string(i) + ".dot";
             std::ofstream out(path);
             if (out.is_open()) {
                 out << dot.str();
                 out.close();
-                std::cout << "[OK] Wrote DFA DOT: " << path << std::endl;
+                std::cout << "[OK] Wrote minimized DFA DOT: " << path << " (pattern: " << patternName << ")" << std::endl;
             } else {
                 std::cerr << "[WARN] Could not open " << path << std::endl;
             }
@@ -336,10 +350,10 @@ int main(int argc, char* argv[]) {
             if (ok) std::cout << "[OK] Wrote " << outPath << std::endl; else std::cerr << "[WARN] Could not write " << outPath << std::endl;
         };
 
-        // Per-DFA JSONs
+        // Per-DFA JSONs with proper naming (dfa_min_i.json)
         size_t dfaCount = dfaModule.getDfaCount();
         for (size_t i = 0; i < dfaCount; ++i) {
-            parseGraphvizToJson(dfaModule.exportGraphvizFor(i), "DFA", "output/dfa_" + std::to_string(i) + ".json");
+            parseGraphvizToJson(dfaModule.exportGraphvizFor(i), "DFA", "output/dfa_min_" + std::to_string(i) + ".json");
         }
         // PDA JSON
         parseGraphvizToJson(pdaModule.exportGraphviz(), "PDA", "output/pda.json");
@@ -370,7 +384,7 @@ int main(int argc, char* argv[]) {
     std::cout << "│ Complexity          │ O(n)             │ O(n)             │" << std::endl;
     std::cout << "└─────────────────────┴──────────────────┴──────────────────┘" << std::endl;
     
-    std::cout << "\nExecution Complete" << std::endl;
+    std::cout << "\nHAHAHHA" << std::endl;
     std::cout << "\nAll automata saved to /output/." << std::endl;
     
     return 0;
