@@ -30,13 +30,17 @@ int main(int argc, char* argv[]) {
     std::filesystem::create_directories("output");
 
     // Check if we're in scan mode (file paths provided as arguments)
-    bool scanMode = (argc > 1);
+    bool scanMode = false;
+    bool dfaVerbose = false;
     std::vector<std::string> filePaths;
-    
-    if (scanMode) {
-        // Collect file paths from command-line arguments
-        for (int i = 1; i < argc; ++i) {
-            filePaths.push_back(std::string(argv[i]));
+    // Parse arguments: files imply scanMode; flag --dfa-verbose enables verbose DFA
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--dfa-verbose") {
+            dfaVerbose = true;
+        } else {
+            scanMode = true;
+            filePaths.push_back(arg);
         }
     }
 
@@ -77,7 +81,24 @@ int main(int argc, char* argv[]) {
             dfaModule.minimizeDFAs();        // DFA minimization (Hopcroft's)
             
             // Scan the provided files (this will show file-by-file details)
-            dfaModule.scanFiles(filePaths);
+            if (dfaVerbose) {
+                dfaModule.scanFiles(filePaths); // uses verbose DFA in module
+            } else {
+                // non-verbose scan: similar path but without transition prints
+                std::vector<bool> detected;
+                std::vector<std::string> matched;
+                std::cout << "\n[INFO] Total files to scan: " << filePaths.size() << std::endl;
+                for (size_t i=0;i<filePaths.size();++i){
+                    std::string fileName = filePaths[i];
+                    size_t lastSlash = fileName.find_last_of("/\\");
+                    if (lastSlash != std::string::npos) fileName = fileName.substr(lastSlash+1);
+                    std::cout << "\n[" << (i+1) << "/" << filePaths.size() << "] Analyzing: " << fileName << std::endl;
+                    std::string m; bool d = dfaModule.testFilenameWithDFA(fileName, m);
+                    detected.push_back(d); matched.push_back(m);
+                    std::cout << "  ✓ Result: " << (d?"SUSPICIOUS ("+m+")":"SAFE") << std::endl;
+                }
+                dfaModule.generateScanReport(filePaths, detected, matched);
+            }
         } else {
             // NORMAL MODE: Use dataset files with structured steps
             // 1. Dataset Loading

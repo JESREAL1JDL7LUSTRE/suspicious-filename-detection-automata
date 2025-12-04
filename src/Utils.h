@@ -101,7 +101,11 @@ struct DFA {
             if (verbose && prev_state != -1) {
                 std::cout << "  State: q" << prev_state << " → q" << current << " (symbol: '" << c << "')" << std::endl;
             }
-            if (current == -1) return false;
+            if (current == -1) {
+                std::cerr << "[INVARIANT FAIL][DFA] Undefined transition from q" << prev_state
+                          << " on '" << c << "'" << std::endl;
+                return false;
+            }
         }
         if (verbose && current != -1) {
             std::cout << "  Final state: q" << current << std::endl;

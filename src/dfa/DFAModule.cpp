@@ -22,6 +22,41 @@ DFAModule::DFAModule() {}
 void DFAModule::loadDataset(const std::string& filepath) {
     dataset = JSONParser::loadFilenameDataset(filepath);
     metrics.filenames_tested = (int)dataset.size();
+    // Dataset sanity checks: benign/malicious counts and extension frequency
+    int malicious = 0, benign = 0;
+    std::map<std::string,int> extFreq;
+    for (const auto& e : dataset) {
+        if (e.is_malicious) malicious++; else benign++;
+        auto pos = e.filename.find_last_of('.');
+        if (pos != std::string::npos && pos+1 < e.filename.size()) {
+            std::string ext = e.filename.substr(pos+1);
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+            extFreq[ext]++;
+        }
+    }
+    std::cout << "[INFO] Loading filename dataset: " << filepath << std::endl;
+    std::cout << "[SUCCESS] Loaded " << dataset.size() << " filename entries" << std::endl;
+    std::cout << "  Malicious: " << malicious << ", Benign: " << benign << std::endl;
+    std::cout << "  Unique extensions: " << extFreq.size() << std::endl;
+    if (benign == 0) {
+        std::cerr << "[WARN] Benign count is zero; evaluation may be biased" << std::endl;
+    }
+    if (dataset.size() > 0) {
+        double imbalance = 100.0 * std::max(malicious, benign) / (double)dataset.size();
+        if (imbalance > 90.0) {
+            std::cerr << "[WARN] Label imbalance > 90% (" << imbalance << "%)" << std::endl;
+        }
+    }
+    // Top-N extensions
+    std::vector<std::pair<std::string,int>> exts(extFreq.begin(), extFreq.end());
+    std::sort(exts.begin(), exts.end(), [](auto&a, auto&b){return a.second>b.second;});
+    int N = std::min(10, (int)exts.size());
+    if (N>0) {
+        std::cout << "  Top extensions:" << std::endl;
+        for (int i=0;i<N;i++) {
+            std::cout << "    ." << exts[i].first << ": " << exts[i].second << std::endl;
+        }
+    }
 }
 
 void DFAModule::definePatterns() {

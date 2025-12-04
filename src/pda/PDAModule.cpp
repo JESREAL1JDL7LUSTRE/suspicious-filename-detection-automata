@@ -133,13 +133,6 @@ bool PDAModule::processPacket(const std::string& packet, std::vector<std::string
     
     // State 1: Expecting SYN-ACK (Server response)
     else if (current == Q_SYN_RECEIVED && packet == "SYN-ACK" && top == "SYN") {
-        // SOUNDNESS CHECK: Missing precondition - SYN must be on stack before SYN-ACK
-        if (top != "SYN") {
-            std::cerr << "[INVARIANT VIOLATION] Missing precondition: SYN before SYN-ACK. "
-                     << "Stack top: " << top << std::endl;
-            pda.current_state = Q_ERROR;
-            return false;
-        }
         pda.push("SYN-ACK");
         pda.current_state = Q_SYNACK_RECEIVED;
         operations.push_back("PUSH(SYN-ACK) → q2");
@@ -148,13 +141,6 @@ bool PDAModule::processPacket(const std::string& packet, std::vector<std::string
     
     // State 2: Expecting ACK (Client acknowledgment)
     else if (current == Q_SYNACK_RECEIVED && packet == "ACK" && top == "SYN-ACK") {
-        // SOUNDNESS CHECK: Stack discipline - verify SYN-ACK is on top before popping
-        if (top != "SYN-ACK") {
-            std::cerr << "[INVARIANT VIOLATION] Missing precondition: SYN-ACK before ACK. "
-                     << "Stack top: " << top << std::endl;
-            pda.current_state = Q_ERROR;
-            return false;
-        }
         pda.pop();  // Pop SYN-ACK
         pda.pop();  // Pop SYN
         pda.current_state = Q_ACCEPT;
@@ -197,9 +183,15 @@ bool PDAModule::processPacket(const std::string& packet, std::vector<std::string
         return false;
     }
     
-    // Invalid transition
+    // Invalid transition with formal logs
+    if (current == Q_SYN_RECEIVED && packet == "ACK") {
+        operations.push_back("[PRECONDITION MISSING] SYN before SYN-ACK");
+    } else if (current == Q_SYNACK_RECEIVED && packet == "ACK" && top != "SYN-ACK") {
+        operations.push_back("[STACK VIOLATION] ACK without SYN-ACK");
+    } else {
+        operations.push_back("ERROR: Invalid transition");
+    }
     pda.current_state = Q_ERROR;
-    operations.push_back("ERROR: Invalid transition");
     return false;
 }
 
