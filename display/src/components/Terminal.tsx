@@ -211,7 +211,8 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
     '[CONTEXT-FREE PROPERTY]',
     '[KEY PROPERTY]',
     '[KEY INSIGHT]',
-    '[EDGE-CASE BEHAVIOR]'
+    '[EDGE-CASE BEHAVIOR]',
+    '[TOKENIZATION DISCIPLINE]'
   ]
   
   filteredOutput = filteredOutput.filter((line) => {
@@ -265,7 +266,20 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
         trimmed.includes('The Chomsky Hierarchy demonstrates computational power:') ||
         trimmed.includes('Type 3 (Regular): Fast pattern matching') ||
         trimmed.includes('Type 2 (CF): Can handle nested/paired structures') ||
-        trimmed.includes('Security systems need BOTH for comprehensive detection')) {
+        trimmed.includes('Security systems need BOTH for comprehensive detection') ||
+        // Filter tokenization discipline content
+        trimmed.includes('Method: Per-character tokenization') ||
+        trimmed.includes('Alphabet: Printable ASCII') ||
+        trimmed.includes('Processing: Sequential character-by-character') ||
+        // Filter complexity notes
+        trimmed.includes('Complexity: O(') ||
+        trimmed.includes('Complexity: O(2^') ||
+        trimmed.includes('Complexity: O(k n log n)') ||
+        trimmed.includes('Empirical:') ||
+        // Filter dataset validation output
+        (trimmed.includes('Malicious:') && trimmed.includes('Benign:')) ||
+        trimmed.includes('Unique extensions:') ||
+        trimmed.includes('Extensions:') && (trimmed.includes('exe') || trimmed.includes('bat') || trimmed.includes('scr'))) {
       return false
     }
     

@@ -61,6 +61,8 @@ public:
     // Getters
     size_t getDfaCount() const;
     const DFAMetrics& getMetrics() const { return metrics; }
+    const std::vector<std::string>& getPatternNames() const { return pattern_names; }
+    const std::vector<std::string>& getRegexPatterns() const { return regex_patterns; }
 };
 
 } // namespace CS311
