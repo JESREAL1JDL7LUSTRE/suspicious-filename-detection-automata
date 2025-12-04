@@ -314,8 +314,12 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
   }
 
   // Custom smooth scroll function with configurable duration
-  const smoothScrollToBottom = useCallback((duration: number = 250) => {
-    if (!terminalRef.current || isUserScrollingRef.current) return
+  // forceScroll: if true, ignore autoScroll state check (for manual toggle)
+  const smoothScrollToBottom = useCallback((duration: number = 250, forceScroll: boolean = false) => {
+    if (!terminalRef.current) return
+    
+    // Only check user scrolling if not forcing
+    if (!forceScroll && isUserScrollingRef.current) return
     
     // Cancel any existing scroll animation
     if (scrollAnimationFrameRef.current !== null) {
@@ -335,10 +339,11 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
     isProgrammaticScrollRef.current = true
     
     const startTime = performance.now()
+    const initialAutoScroll = autoScroll // Capture at start
     
     const animateScroll = (currentTime: number) => {
-      // Check if auto-scroll was disabled or user is scrolling
-      if (!autoScroll || isUserScrollingRef.current || !terminalRef.current) {
+      // Check if auto-scroll was disabled (only if not forcing) or user is scrolling
+      if ((!forceScroll && !initialAutoScroll) || (!forceScroll && isUserScrollingRef.current) || !terminalRef.current) {
         scrollAnimationFrameRef.current = null
         isProgrammaticScrollRef.current = false
         return
@@ -425,7 +430,7 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
           // Only scroll if not already at bottom
           if (!isAtBottom) {
             // Faster scroll for readability
-            smoothScrollToBottom(2000)
+            smoothScrollToBottom(8000)
           }
         }
       }
@@ -515,14 +520,27 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
     
     setAutoScroll(newAutoScroll)
     
-    // If enabling auto-scroll, scroll to bottom smoothly with slower speed for existing content
-    if (newAutoScroll && terminalRef.current && !isUserScrollingRef.current) {
-      setTimeout(() => {
-        if (terminalRef.current && !isUserScrollingRef.current && autoScroll) {
-          // Faster scroll for readability
-          smoothScrollToBottom(2000)
-        }
-      }, 100)
+    // If enabling auto-scroll, scroll to bottom smoothly regardless of current position
+    if (newAutoScroll && terminalRef.current) {
+      // Reset user scrolling flag to allow programmatic scroll
+      isUserScrollingRef.current = false
+      
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          if (terminalRef.current) {
+            const container = terminalRef.current
+            const { scrollTop, scrollHeight, clientHeight } = container
+            const isAtBottom = scrollHeight - scrollTop - clientHeight < 10
+            
+            // Always scroll if not at bottom, even if user was at top
+            if (!isAtBottom) {
+              // Use smooth scroll for existing content, force it to complete
+              smoothScrollToBottom(4000, true) // forceScroll = true to ignore state checks
+            }
+          }
+        }, 50)
+      })
     }
   }
 

@@ -384,7 +384,7 @@ int main(int argc, char* argv[]) {
     std::cout << "│ Complexity          │ O(n)             │ O(n)             │" << std::endl;
     std::cout << "└─────────────────────┴──────────────────┴──────────────────┘" << std::endl;
     
-    std::cout << "\nExecution Complete" << std::endl;
+    std::cout << "\nHAHAHHA" << std::endl;
     std::cout << "\nAll automata saved to /output/." << std::endl;
     
     return 0;
