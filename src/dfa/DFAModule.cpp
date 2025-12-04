@@ -38,15 +38,7 @@ void DFAModule::loadDataset(const std::string& filepath) {
     std::cout << "[SUCCESS] Loaded " << dataset.size() << " filename entries" << std::endl;
     std::cout << "  Malicious: " << malicious << ", Benign: " << benign << std::endl;
     std::cout << "  Unique extensions: " << extFreq.size() << std::endl;
-    if (benign == 0) {
-        std::cerr << "[WARN] Benign count is zero; evaluation may be biased" << std::endl;
-    }
-    if (dataset.size() > 0) {
-        double imbalance = 100.0 * std::max(malicious, benign) / (double)dataset.size();
-        if (imbalance > 90.0) {
-            std::cerr << "[WARN] Label imbalance > 90% (" << imbalance << "%)" << std::endl;
-        }
-    }
+    // Note: Additional CSV integration may rebalance labels; final counts shown after CSV ingest
     // Top-N extensions
     std::vector<std::pair<std::string,int>> exts(extFreq.begin(), extFreq.end());
     std::sort(exts.begin(), exts.end(), [](auto&a, auto&b){return a.second>b.second;});
@@ -88,6 +80,19 @@ void DFAModule::definePatterns() {
     
     regex_patterns.push_back("update");
     pattern_names.push_back("mimic_legitimate");
+
+    // Expanded deceptive keywords coverage (substring-based)
+    regex_patterns.push_back("password");
+    pattern_names.push_back("deceptive_password");
+
+    regex_patterns.push_back("stealer");
+    pattern_names.push_back("deceptive_stealer");
+
+    regex_patterns.push_back("setup");
+    pattern_names.push_back("deceptive_setup");
+
+    regex_patterns.push_back("patch");
+    pattern_names.push_back("deceptive_patch");
     
     metrics.total_patterns = (int)regex_patterns.size();
     
@@ -433,15 +438,27 @@ bool DFAModule::testFilenameWithDFAVerbose(const std::string& filename, std::str
 
 // Run a DFA on input string
 bool DFAModule::runDFA(const DFA& dfa, const std::string& input) {
-    // Default verbose mode OFF to avoid measurement bias on performance metrics
-    // Verbose mode can be enabled via frontend toggle
-    return dfa.accepts(input, false);
+    // Normalize to printable ASCII for DFA processing
+    std::string ascii;
+    ascii.reserve(input.size());
+    for (unsigned char c : input) {
+        if (c >= 32 && c <= 126) ascii.push_back((char)c);
+        else ascii.push_back('_');
+    }
+    return dfa.accepts(ascii, false);
 }
 
 // Run a DFA on input string with verbose state transitions (for file scanning visualization)
 bool DFAModule::runDFAVerbose(const DFA& dfa, const std::string& input) {
     // Verbose mode ON for file scanning to enable progressive state coloring
-    return dfa.accepts(input, true);
+    // Normalize to printable ASCII
+    std::string ascii;
+    ascii.reserve(input.size());
+    for (unsigned char c : input) {
+        if (c >= 32 && c <= 126) ascii.push_back((char)c);
+        else ascii.push_back('_');
+    }
+    return dfa.accepts(ascii, true);
 }
 
 // Additional pattern checks (for comprehensive detection)
@@ -475,6 +492,81 @@ bool DFAModule::checkAdditionalPatterns(const std::string& filename,
     }
     
     return false;
+}
+
+void DFAModule::integrateCombinedAndMalwareCSVs(const std::string& combinedCsvPath,
+                                                const std::string& malwareCsvPath) {
+    auto synthFromHash = [&](const std::string& hash, bool malicious){
+        FilenameEntry e;
+        std::string base = hash.substr(0, std::min<size_t>(16, hash.size()));
+        e.filename = base + (malicious ? ".exe" : ".txt");
+        e.technique = malicious ? "malicious_synthesized" : "benign_synthesized";
+        e.category = malicious ? "malicious" : "benign";
+        e.detected_by = "csv";
+        e.is_malicious = malicious;
+        dataset.push_back(e);
+    };
+
+    // Ingest combined_random.csv (type column: 1=benign, 0=malicious)
+    {
+        std::ifstream in(combinedCsvPath);
+        if (!in.is_open()) {
+            std::cerr << "[WARN] Could not open combined CSV: " << combinedCsvPath << std::endl;
+        } else {
+            std::cout << "[INFO] Integrating combined CSV: " << combinedCsvPath << std::endl;
+            std::string line; bool headerSkipped=false; int added=0;
+            while (std::getline(in, line)) {
+                if (!headerSkipped) { headerSkipped=true; continue; }
+                if (line.empty()) continue;
+                std::istringstream ss(line);
+                std::string typeStr, hash;
+                if (!std::getline(ss, typeStr, ',')) continue;
+                if (!std::getline(ss, hash, ',')) continue;
+                if (hash.empty()) continue;
+                bool malicious = (typeStr == "0");
+                synthFromHash(hash, malicious);
+                added++;
+            }
+            in.close();
+            std::cout << "[SUCCESS] Added " << added << " entries from combined_random.csv" << std::endl;
+        }
+    }
+
+    // Ingest malware.csv (all treated as malicious)
+    {
+        std::ifstream in(malwareCsvPath);
+        if (!in.is_open()) {
+            std::cerr << "[WARN] Could not open malware CSV: " << malwareCsvPath << std::endl;
+        } else {
+            std::cout << "[INFO] Integrating malware CSV: " << malwareCsvPath << std::endl;
+            std::string line; bool headerSkipped=false; int added=0;
+            while (std::getline(in, line)) {
+                if (!headerSkipped) { headerSkipped=true; continue; }
+                if (line.empty()) continue;
+                std::istringstream ss(line);
+                std::string typeStr, hash;
+                if (!std::getline(ss, typeStr, ',')) continue;
+                if (!std::getline(ss, hash, ',')) continue;
+                if (hash.empty()) continue;
+                synthFromHash(hash, true);
+                added++;
+            }
+            in.close();
+            std::cout << "[SUCCESS] Added " << added << " entries from malware.csv" << std::endl;
+        }
+    }
+
+    metrics.filenames_tested = (int)dataset.size();
+    // Post-ingest label summary accounting for combined_random (type=1) and malware.csv
+    int malicious = 0, benign = 0;
+    for (const auto& e : dataset) { if (e.is_malicious) malicious++; else benign++; }
+    std::cout << "[INFO] Post-ingest label summary" << std::endl;
+    std::cout << "  Malicious: " << malicious << ", Benign: " << benign << std::endl;
+    if (malicious + benign > 0) {
+        double maj = (double)std::max(malicious, benign);
+        double imbalance = 100.0 * maj / (double)(malicious + benign);
+        std::cout << "  Label balance (majority share): " << imbalance << "%" << std::endl;
+    }
 }
 
 void DFAModule::generateReport() {

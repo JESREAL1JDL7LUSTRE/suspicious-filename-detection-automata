@@ -66,6 +66,12 @@ public:
     // Public non-verbose DFA run/classification
     bool runDFA(const DFA& dfa, const std::string& input);
     bool testFilenameWithDFA(const std::string& filename, std::string& matched_pattern);
+    // Integrate evaluation CSVs: combined_random (type column) and malware
+    // Synthesizes filenames from hashes and routes by label:
+    // - combined_random.csv: type=1 -> benign, type=0 -> malicious
+    // - malware.csv: all rows treated as malicious
+    void integrateCombinedAndMalwareCSVs(const std::string& combinedCsvPath,
+                                         const std::string& malwareCsvPath);
     // Export Graphviz DOT for the built DFAs (after convertToDFAs / applyIGA)
     std::string exportGraphvizAll() const;
     // Export single DFA cluster by index (useful to write separate files)

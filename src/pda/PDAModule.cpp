@@ -32,11 +32,15 @@ void PDAModule::defineCFG() {
     std::cout << "\nProduction Rules:" << std::endl;
     std::cout << "  S  → SYN A                (Start with SYN)" << std::endl;
     std::cout << "  A  → SYN-ACK B            (Must respond with SYN-ACK)" << std::endl;
-    std::cout << "  B  → ACK C                (Complete handshake with ACK)" << std::endl;
-    std::cout << "  C  → DATA C | FIN | ε     (Data transfer or finish)" << std::endl;
+    std::cout << "  B  → ACK " << (strictHandshakeOnly ? "ε" : "C") << "                (Complete handshake with ACK)" << std::endl;
+    if (strictHandshakeOnly) {
+        std::cout << "  (Strict mode: handshake-only; no DATA/FIN productions)" << std::endl;
+    } else {
+        std::cout << "  C  → DATA C | FIN | ε     (Data transfer or finish)" << std::endl;
+    }
     
-    std::cout << "\nTerminals: { SYN, SYN-ACK, ACK, DATA, FIN, RST }" << std::endl;
-    std::cout << "Non-terminals: { S, A, B, C }" << std::endl;
+    std::cout << "\nTerminals: { SYN, SYN-ACK, ACK" << (strictHandshakeOnly ? "" : ", DATA, FIN") << ", RST }" << std::endl;
+    std::cout << "Non-terminals: { S, A, B" << (strictHandshakeOnly ? "" : ", C") << " }" << std::endl;
     std::cout << "Start symbol: S" << std::endl;
     std::cout << std::endl;
 }
@@ -77,14 +81,18 @@ void PDAModule::buildPDA() {
 
 void PDAModule::printCFG() {
     std::cout << "\n[CFG — Canonical Form]" << std::endl;
-    std::cout << "V = { S, A, B, C }" << std::endl;
-    std::cout << "Σ = { SYN, SYN-ACK, ACK, DATA, FIN, RST }" << std::endl;
+    std::cout << "V = { S, A, B" << (strictHandshakeOnly ? "" : ", C") << " }" << std::endl;
+    std::cout << "Σ = { SYN, SYN-ACK, ACK" << (strictHandshakeOnly ? "" : ", DATA, FIN") << ", RST }" << std::endl;
     std::cout << "S = S" << std::endl;
     std::cout << "P = {" << std::endl;
     std::cout << "  S → SYN A," << std::endl;
     std::cout << "  A → SYN-ACK B," << std::endl;
-    std::cout << "  B → ACK C," << std::endl;
-    std::cout << "  C → DATA C | FIN | ε" << std::endl;
+    if (strictHandshakeOnly) {
+        std::cout << "  B → ACK" << std::endl;
+    } else {
+        std::cout << "  B → ACK C," << std::endl;
+        std::cout << "  C → DATA C | FIN | ε" << std::endl;
+    }
     std::cout << "}" << std::endl;
 }
 
@@ -150,20 +158,22 @@ bool PDAModule::processPacket(const std::string& packet, std::vector<std::string
     
     // State 3: After handshake - allow data transfer
     else if (current == Q_ACCEPT) {
-        if (packet == "DATA") {
-            operations.push_back("ACCEPT DATA → q3");
-            return true;
-        }
-        else if (packet == "FIN") {
-            operations.push_back("ACCEPT FIN → q3");
-            return true;
-        }
-        else if (packet == "ACK") {
-            operations.push_back("ACCEPT ACK → q3");
-            return true;
+        if (!strictHandshakeOnly) {
+            if (packet == "DATA") {
+                operations.push_back("ACCEPT DATA → q3");
+                return true;
+            }
+            else if (packet == "FIN") {
+                operations.push_back("ACCEPT FIN → q3");
+                return true;
+            }
+            else if (packet == "ACK") {
+                operations.push_back("ACCEPT ACK → q3");
+                return true;
+            }
         }
         // Allow new handshake after completion
-        else if (packet == "SYN") {
+        if (!strictHandshakeOnly && packet == "SYN") {
             pda.push("SYN");
             pda.current_state = Q_SYN_RECEIVED;
             operations.push_back("NEW HANDSHAKE: PUSH(SYN) → q1");
@@ -477,9 +487,9 @@ std::string PDAModule::exportGraphviz() const {
         ss << "    p_s" << Q_SYN_RECEIVED << " -> p_s" << Q_SYNACK_RECEIVED << " [label=\"SYN-ACK\"];\n";
     if (hasState(Q_SYNACK_RECEIVED) && hasState(Q_ACCEPT))
         ss << "    p_s" << Q_SYNACK_RECEIVED << " -> p_s" << Q_ACCEPT << " [label=\"ACK\"];\n";
-    if (hasState(Q_ACCEPT))
+    if (!strictHandshakeOnly && hasState(Q_ACCEPT))
         ss << "    p_s" << Q_ACCEPT << " -> p_s" << Q_ACCEPT << " [label=\"DATA,ACK,FIN\"];\n";
-    if (hasState(Q_ACCEPT) && hasState(Q_SYN_RECEIVED))
+    if (!strictHandshakeOnly && hasState(Q_ACCEPT) && hasState(Q_SYN_RECEIVED))
         ss << "    p_s" << Q_ACCEPT << " -> p_s" << Q_SYN_RECEIVED << " [label=\"SYN (new)\"];\n";
 
     ss << "  }\n";

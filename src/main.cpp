@@ -32,12 +32,15 @@ int main(int argc, char* argv[]) {
     // Check if we're in scan mode (file paths provided as arguments)
     bool scanMode = false;
     bool dfaVerbose = false;
+    bool strictHandshake = false;
     std::vector<std::string> filePaths;
     // Parse arguments: files imply scanMode; flag --dfa-verbose enables verbose DFA
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "--dfa-verbose") {
             dfaVerbose = true;
+        } else if (arg == "--strict-handshake") {
+            strictHandshake = true;
         } else {
             scanMode = true;
             filePaths.push_back(arg);
@@ -103,9 +106,12 @@ int main(int argc, char* argv[]) {
             // NORMAL MODE: Use dataset files with structured steps
             // 1. Dataset Loading
             std::cout << "1. Dataset Loading" << std::endl;
-            std::cout << "[INFO] Reading dataset: archive/Malicious_file_trick_detection.jsonl" << std::endl;
+            std::cout << "[INFO] Reading filename dataset: archive/Malicious_file_trick_detection.jsonl" << std::endl;
             dfaModule.loadDataset("archive/Malicious_file_trick_detection.jsonl");
-            std::cout << "✓ SUCCESS — Loaded " << dfaModule.getMetrics().filenames_tested << " filenames" << std::endl;
+            std::cout << "[INFO] Integrating CSVs: archive/combined_random.csv (type-labeled) + archive/malware.csv" << std::endl;
+            dfaModule.integrateCombinedAndMalwareCSVs("archive/combined_random.csv", "archive/malware.csv");
+            std::cout << "✓ SUCCESS — Evaluation sources: JSONL + combined_random + malware (no benign.csv)" << std::endl;
+            std::cout << "✓ SUCCESS — Total filenames staged: " << dfaModule.getMetrics().filenames_tested << std::endl;
             std::cout << std::endl;
 
             // 2. Regex Pattern Definition
@@ -188,6 +194,10 @@ int main(int argc, char* argv[]) {
         std::cout << "1. Loading TCP Trace Dataset" << std::endl;
         std::cout << "[INFO] Reading: archive/tcp_handshake_traces_expanded.jsonl" << std::endl;
         pdaModule.loadDataset("archive/tcp_handshake_traces_expanded.jsonl");
+        if (strictHandshake) {
+            std::cout << "[INFO] Strict handshake-only CFG enabled" << std::endl;
+            pdaModule.setStrictHandshake(true);
+        }
         const auto& pdaM1 = pdaModule.getMetrics();
         std::cout << "✓ SUCCESS — Loaded " << pdaM1.total_traces << " traces" << std::endl;
         std::cout << "Valid:   " << pdaM1.valid_traces << std::endl;
