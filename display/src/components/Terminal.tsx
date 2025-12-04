@@ -211,7 +211,8 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
     '[CONTEXT-FREE PROPERTY]',
     '[KEY PROPERTY]',
     '[KEY INSIGHT]',
-    '[EDGE-CASE BEHAVIOR]'
+    '[EDGE-CASE BEHAVIOR]',
+    '[TOKENIZATION DISCIPLINE]'
   ]
   
   let inUnwantedSection = false
@@ -250,9 +251,18 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
     }
     
     // Filter out lines that contain content from these sections even if section header wasn't caught
+    // IMPORTANT: Always allow [INFO], [SUCCESS], [ERROR], [WARN] messages through
+    const isImportantMessage = trimmed.startsWith('[INFO]') || trimmed.startsWith('[SUCCESS]') || trimmed.startsWith('[ERROR]') || trimmed.startsWith('[WARN]')
+    
+    // Skip filtering for important messages
+    if (isImportantMessage) {
+      return true
+    }
+    
+    // Filter unwanted content only from non-important lines
     if (trimmed.includes('Ground truth derived from:') ||
-        trimmed.includes('Labels:') && trimmed.includes('field indicates ground truth') ||
-        trimmed.includes('Dataset contains') && (trimmed.includes('malicious filename patterns') || trimmed.includes('TCP handshake sequences')) ||
+        (trimmed.includes('Labels:') && trimmed.includes('field indicates ground truth')) ||
+        (trimmed.includes('Dataset contains') && (trimmed.includes('malicious filename patterns') || trimmed.includes('TCP handshake sequences'))) ||
         trimmed.includes('This is a Type-2 (Context-Free) language because:') ||
         trimmed.includes('Requires STACK memory to track pairing') ||
         trimmed.includes('Cannot be recognized by DFA (Type-3)') ||
@@ -266,7 +276,20 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
         trimmed.includes('The Chomsky Hierarchy demonstrates computational power:') ||
         trimmed.includes('Type 3 (Regular): Fast pattern matching') ||
         trimmed.includes('Type 2 (CF): Can handle nested/paired structures') ||
-        trimmed.includes('Security systems need BOTH for comprehensive detection')) {
+        trimmed.includes('Security systems need BOTH for comprehensive detection') ||
+        // Filter tokenization discipline content (only if not in important message)
+        trimmed.includes('Method: Per-character tokenization') ||
+        trimmed.includes('Alphabet: Printable ASCII') ||
+        trimmed.includes('Processing: Sequential character-by-character') ||
+        // Filter complexity notes (only standalone lines, not in important messages)
+        (trimmed.includes('Complexity: O(') && !trimmed.startsWith('[')) ||
+        (trimmed.includes('Complexity: O(2^') && !trimmed.startsWith('[')) ||
+        (trimmed.includes('Complexity: O(k n log n)') && !trimmed.startsWith('[')) ||
+        (trimmed.includes('Empirical:') && !trimmed.startsWith('[')) ||
+        // Filter dataset validation output (only if it's a standalone line, not part of [SUCCESS])
+        ((trimmed.includes('Malicious:') && trimmed.includes('Benign:')) && !trimmed.startsWith('[')) ||
+        (trimmed.includes('Unique extensions:') && !trimmed.startsWith('[')) ||
+        (trimmed.includes('Extensions:') && (trimmed.includes('exe') || trimmed.includes('bat') || trimmed.includes('scr')) && !trimmed.startsWith('['))) {
       return false
     }
     
@@ -291,8 +314,12 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
   }
 
   // Custom smooth scroll function with configurable duration
-  const smoothScrollToBottom = useCallback((duration: number = 250) => {
-    if (!terminalRef.current || isUserScrollingRef.current) return
+  // forceScroll: if true, ignore autoScroll state check (for manual toggle)
+  const smoothScrollToBottom = useCallback((duration: number = 250, forceScroll: boolean = false) => {
+    if (!terminalRef.current) return
+    
+    // Only check user scrolling if not forcing
+    if (!forceScroll && isUserScrollingRef.current) return
     
     // Cancel any existing scroll animation
     if (scrollAnimationFrameRef.current !== null) {
@@ -312,10 +339,11 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
     isProgrammaticScrollRef.current = true
     
     const startTime = performance.now()
+    const initialAutoScroll = autoScroll // Capture at start
     
     const animateScroll = (currentTime: number) => {
-      // Check if auto-scroll was disabled or user is scrolling
-      if (!autoScroll || isUserScrollingRef.current || !terminalRef.current) {
+      // Check if auto-scroll was disabled (only if not forcing) or user is scrolling
+      if ((!forceScroll && !initialAutoScroll) || (!forceScroll && isUserScrollingRef.current) || !terminalRef.current) {
         scrollAnimationFrameRef.current = null
         isProgrammaticScrollRef.current = false
         return
@@ -402,7 +430,7 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
           // Only scroll if not already at bottom
           if (!isAtBottom) {
             // Faster scroll for readability
-            smoothScrollToBottom(2000)
+            smoothScrollToBottom(8000)
           }
         }
       }
@@ -492,14 +520,27 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
     
     setAutoScroll(newAutoScroll)
     
-    // If enabling auto-scroll, scroll to bottom smoothly with slower speed for existing content
-    if (newAutoScroll && terminalRef.current && !isUserScrollingRef.current) {
-      setTimeout(() => {
-        if (terminalRef.current && !isUserScrollingRef.current && autoScroll) {
-          // Faster scroll for readability
-          smoothScrollToBottom(2000)
-        }
-      }, 100)
+    // If enabling auto-scroll, scroll to bottom smoothly regardless of current position
+    if (newAutoScroll && terminalRef.current) {
+      // Reset user scrolling flag to allow programmatic scroll
+      isUserScrollingRef.current = false
+      
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          if (terminalRef.current) {
+            const container = terminalRef.current
+            const { scrollTop, scrollHeight, clientHeight } = container
+            const isAtBottom = scrollHeight - scrollTop - clientHeight < 10
+            
+            // Always scroll if not at bottom, even if user was at top
+            if (!isAtBottom) {
+              // Use smooth scroll for existing content, force it to complete
+              smoothScrollToBottom(4000, true) // forceScroll = true to ignore state checks
+            }
+          }
+        }, 50)
+      })
     }
   }
 

@@ -104,6 +104,25 @@ bool PDAModule::processPacket(const std::string& packet, std::vector<std::string
     std::string top = pda.peek();
     int current = pda.current_state;
     
+    // SOUNDNESS CHECK: Verify current state is in Q
+    bool state_valid = false;
+    for (const auto& s : pda.states) {
+        if (s.id == current) {
+            state_valid = true;
+            break;
+        }
+    }
+    if (!state_valid) {
+        std::cerr << "[INVARIANT VIOLATION] Current state " << current 
+                 << " not in Q. Valid states: ";
+        for (const auto& s : pda.states) {
+            std::cerr << s.id << " ";
+        }
+        std::cerr << std::endl;
+        pda.current_state = Q_ERROR;
+        return false;
+    }
+    
     // State 0: Expecting SYN (Start of handshake)
     if (current == Q_START && packet == "SYN") {
         pda.push("SYN");
@@ -114,6 +133,13 @@ bool PDAModule::processPacket(const std::string& packet, std::vector<std::string
     
     // State 1: Expecting SYN-ACK (Server response)
     else if (current == Q_SYN_RECEIVED && packet == "SYN-ACK" && top == "SYN") {
+        // SOUNDNESS CHECK: Missing precondition - SYN must be on stack before SYN-ACK
+        if (top != "SYN") {
+            std::cerr << "[INVARIANT VIOLATION] Missing precondition: SYN before SYN-ACK. "
+                     << "Stack top: " << top << std::endl;
+            pda.current_state = Q_ERROR;
+            return false;
+        }
         pda.push("SYN-ACK");
         pda.current_state = Q_SYNACK_RECEIVED;
         operations.push_back("PUSH(SYN-ACK) → q2");
@@ -122,6 +148,13 @@ bool PDAModule::processPacket(const std::string& packet, std::vector<std::string
     
     // State 2: Expecting ACK (Client acknowledgment)
     else if (current == Q_SYNACK_RECEIVED && packet == "ACK" && top == "SYN-ACK") {
+        // SOUNDNESS CHECK: Stack discipline - verify SYN-ACK is on top before popping
+        if (top != "SYN-ACK") {
+            std::cerr << "[INVARIANT VIOLATION] Missing precondition: SYN-ACK before ACK. "
+                     << "Stack top: " << top << std::endl;
+            pda.current_state = Q_ERROR;
+            return false;
+        }
         pda.pop();  // Pop SYN-ACK
         pda.pop();  // Pop SYN
         pda.current_state = Q_ACCEPT;
@@ -178,10 +211,41 @@ bool PDAModule::validateSequence(const std::vector<std::string>& sequence) {
         if (!processPacket(packet, ops)) {
             return false;
         }
+        
+        // SOUNDNESS CHECK: Stack discipline - verify stack depth is reasonable
+        int stack_depth = pda.getStackDepth();
+        if (stack_depth < 0) {
+            std::cerr << "[INVARIANT VIOLATION] Stack depth negative: " << stack_depth << std::endl;
+            return false;
+        }
+        if (stack_depth > 100) { // Reasonable upper bound
+            std::cerr << "[INVARIANT VIOLATION] Stack depth exceeds reasonable limit: " << stack_depth << std::endl;
+            return false;
+        }
+    }
+    
+    // SOUNDNESS CHECK: Acceptance condition - state-based AND empty stack
+    bool in_accepting_state = pda.accepting_states.count(pda.current_state) > 0;
+    bool stack_empty = pda.pda_stack.size() == 1; // Only BOTTOM marker
+    
+    if (in_accepting_state && !stack_empty) {
+        std::cerr << "[INVARIANT VIOLATION] Missing precondition: In accepting state but stack not empty. "
+                 << "Stack depth: " << pda.getStackDepth() << std::endl;
+    }
+    if (!in_accepting_state && stack_empty) {
+        // This is valid - not accepting yet
     }
     
     // Accept if in accepting state with empty stack
-    return pda.isAccepting();
+    bool result = pda.isAccepting();
+    
+    // Log acceptance condition details if verbose
+    if (!result && in_accepting_state) {
+        std::cerr << "[INVARIANT VIOLATION] In accepting state but stack not empty. "
+                 << "Stack depth: " << pda.getStackDepth() << std::endl;
+    }
+    
+    return result;
 }
 
 void PDAModule::testAllTraces() {

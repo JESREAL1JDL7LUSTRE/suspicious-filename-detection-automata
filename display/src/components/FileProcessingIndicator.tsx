@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import type { ScanResult } from '../hooks/useFileScan'
 
 interface FileProcessingIndicatorProps {
@@ -16,11 +16,17 @@ export function FileProcessingIndicator({
 }: FileProcessingIndicatorProps) {
   const [currentFileName, setCurrentFileName] = useState<string>('')
   const [currentFileIndex, setCurrentFileIndex] = useState<number>(0)
+  const updateScheduledRef = useRef(false)
 
   // Parse terminal output to find current file being processed
   useEffect(() => {
     if (!isScanning && !currentFileName) {
       // Only reset if we don't have a current file
+      return
+    }
+
+    // Prevent multiple synchronous updates
+    if (updateScheduledRef.current) {
       return
     }
 
@@ -30,15 +36,6 @@ export function FileProcessingIndicator({
     // Combine all terminal output chunks and search through it
     // Each chunk might be a full line or part of a line
     const allText = terminalOutput.join('')
-    
-    // Debug: log terminal output to see what we're parsing (only in development)
-    if (terminalOutput.length > 0 && isScanning && process.env.NODE_ENV === 'development') {
-      console.log('FileProcessingIndicator - Terminal output chunks:', terminalOutput.length)
-      const lastChunk = terminalOutput[terminalOutput.length - 1]
-      if (lastChunk) {
-        console.log('FileProcessingIndicator - Last chunk:', lastChunk.substring(0, 200))
-      }
-    }
     
     // Try multiple regex patterns to catch the file name
     // Pattern 1: Complete line with filename on same line - most common format
@@ -66,7 +63,7 @@ export function FileProcessingIndicator({
     
     // Pattern 2: File might be on next line after "Analyzing:"
     if (!latestMatch) {
-      const pattern2 = /\[(\d+)\/(\d+)\]\s*Analyzing:\s*\n\s*([^\n\r\[\]]+)/gi
+      const pattern2 = /\[(\d+)\/(\d+)\]\s*Analyzing:\s*\n\s*([^\n\r[\]]+)/gi
       while ((match = pattern2.exec(allText)) !== null) {
         const fileIndex = parseInt(match[1])
         let fileName = match[3].trim()
@@ -80,8 +77,9 @@ export function FileProcessingIndicator({
       }
     }
     
-    // Pattern 3: Also check for partial matches (in case text is still being typed)
+    // Pattern 3: Partial matches
     if (!latestMatch) {
+      // Also check for partial matches (in case text is still being typed)
       const pattern3 = /\[(\d+)\/(\d+)\]\s*Analyzing:\s*([^\n\r]{1,200})/gi
       while ((match = pattern3.exec(allText)) !== null) {
         const fileIndex = parseInt(match[1])
@@ -100,15 +98,24 @@ export function FileProcessingIndicator({
     }
     
     // Update state if we found a match
+    // Schedule state update to avoid cascading renders
     if (latestMatch) {
-      setCurrentFileIndex(latestMatch.index)
-      setCurrentFileName(latestMatch.fileName)
+      updateScheduledRef.current = true
+      setTimeout(() => {
+        setCurrentFileIndex(latestMatch.index)
+        setCurrentFileName(latestMatch.fileName)
+        updateScheduledRef.current = false
+      }, 0)
     } else if (scanResults.length > 0 && !currentFileName) {
       // Fallback: use the last scan result if we don't have a current file
       const lastResult = scanResults[scanResults.length - 1]
-      if (lastResult && lastResult.file) {
-        setCurrentFileIndex(scanResults.length)
-        setCurrentFileName(lastResult.file)
+      if (lastResult?.file) {
+        updateScheduledRef.current = true
+        setTimeout(() => {
+          setCurrentFileIndex(scanResults.length)
+          setCurrentFileName(lastResult.file)
+          updateScheduledRef.current = false
+        }, 0)
       }
     }
   }, [terminalOutput, isScanning, scanResults, currentFileName])
@@ -128,7 +135,7 @@ export function FileProcessingIndicator({
   let currentResult: ScanResult | null = null
   if (currentFileName) {
     // First try to find by exact filename match
-    currentResult = scanResults.find(r => r.file === currentFileName)
+    currentResult = scanResults.find(r => r.file === currentFileName) || null
     
     // If not found, try partial match
     if (!currentResult) {
@@ -137,18 +144,18 @@ export function FileProcessingIndicator({
         currentFileName.includes(r.file) ||
         r.path.includes(currentFileName) ||
         currentFileName.includes(r.path)
-      )
+      ) || null
     }
     
     // If still not found, try by index (currentFileIndex is 1-based, scanResults is 0-based)
     if (!currentResult && currentFileIndex > 0 && currentFileIndex <= scanResults.length) {
-      currentResult = scanResults[currentFileIndex - 1]
+      currentResult = scanResults[currentFileIndex - 1] || null
     }
   }
   
   // Fallback to most recent result
   if (!currentResult && scanResults.length > 0) {
-    currentResult = scanResults[scanResults.length - 1]
+    currentResult = scanResults[scanResults.length - 1] || null
   }
 
   const getStatusColor = (status: string, severity?: string) => {
@@ -185,7 +192,6 @@ export function FileProcessingIndicator({
         </div>
       )}
 
-      {/* Current file being processed */}
       <div className="space-y-2">
         {currentFileName ? (
           <>
@@ -223,4 +229,3 @@ export function FileProcessingIndicator({
     </div>
   )
 }
-

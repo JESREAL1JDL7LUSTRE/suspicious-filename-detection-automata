@@ -36,7 +36,9 @@ private:
     
     // NEW: Actually use DFAs for testing
     bool testFilenameWithDFA(const std::string& filename, std::string& matched_pattern);
+    bool testFilenameWithDFAVerbose(const std::string& filename, std::string& matched_pattern);
     bool runDFA(const DFA& dfa, const std::string& input);
+    bool runDFAVerbose(const DFA& dfa, const std::string& input);
     bool checkAdditionalPatterns(const std::string& filename, std::string& matched_pattern);
     // Tokenization discipline: current DFA is per-character; helper to expose alphabet
     std::set<char> getAlphabetUnion() const;
@@ -71,6 +73,8 @@ public:
     // Getters
     size_t getDfaCount() const;
     const DFAMetrics& getMetrics() const { return metrics; }
+    const std::vector<std::string>& getPatternNames() const { return pattern_names; }
+    const std::vector<std::string>& getRegexPatterns() const { return regex_patterns; }
 };
 
 } // namespace CS311

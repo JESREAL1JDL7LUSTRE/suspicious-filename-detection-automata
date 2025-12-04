@@ -98,7 +98,21 @@ export function useSimulator(onComplete?: () => void) {
                   console.log('Received SSE data type:', data.type)
                   
                   if (data.type === 'stdout' || data.type === 'stderr') {
-                    setTerminalOutput((prev) => [...prev, data.message])
+                    // Split message by newlines to handle multi-line messages
+                    const message = data.message || ''
+                    const lines = message.split(/\r?\n/)
+                    
+                    // Filter out duplicate "Starting simulator" messages from stdout/stderr
+                    // (C++ program also outputs this, but server already sends it as 'start' message)
+                    const filteredLines = lines.filter(line => {
+                      const trimmed = line.trim().toLowerCase()
+                      // Skip if it's a duplicate "Starting simulator" message
+                      return !(trimmed === 'starting simulator...' || trimmed === 'starting simulator')
+                    })
+                    
+                    // Add each line separately to the terminal output
+                    // Preserve empty lines for proper formatting
+                    setTerminalOutput((prev) => [...prev, ...filteredLines])
                   } else if (data.type === 'end') {
                     // Check if simulator completed successfully (code 0)
                     const success = data.code === 0
@@ -118,7 +132,24 @@ export function useSimulator(onComplete?: () => void) {
                     setHasRunSimulator(false) // Don't enable if there was an error
                     return // Exit the read loop
                   } else if (data.type === 'start') {
-                    setTerminalOutput((prev) => [...prev, data.message])
+                    // Split start message by newlines and filter empty lines
+                    const message = data.message || ''
+                    const lines = message.split(/\r?\n/).filter(line => line.trim().length > 0)
+                    // Only add if we have lines and avoid duplicates
+                    if (lines.length > 0) {
+                      setTerminalOutput((prev) => {
+                        // Check if any of the new lines already exist in the last few lines to avoid duplicates
+                        const lastFewLines = prev.slice(-3) // Check last 3 lines
+                        const newLinesToAdd = lines.filter(newLine => {
+                          // Skip if this line already exists in recent output
+                          return !lastFewLines.some(existingLine => 
+                            existingLine.trim() === newLine.trim() || 
+                            (existingLine.includes('Starting simulator') && newLine.includes('Starting simulator'))
+                          )
+                        })
+                        return newLinesToAdd.length > 0 ? [...prev, ...newLinesToAdd] : prev
+                      })
+                    }
                   }
                 } catch (e) {
                   console.error('Error parsing SSE data:', e, 'Line:', line)
