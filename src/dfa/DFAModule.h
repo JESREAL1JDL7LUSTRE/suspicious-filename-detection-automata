@@ -23,8 +23,11 @@ private:
     std::vector<NFA> nfas;
     std::vector<DFA> dfas;
     std::vector<DFA> minimized_dfas;
-    std::vector<DFA> grouped_dfas;
     DFAMetrics metrics;
+    // Per-pattern evaluation metrics
+    struct PatternMetrics { int tp=0; int fp=0; int fn=0; int tn=0; double precision=0; double recall=0; double f1=0; };
+    std::map<std::string, PatternMetrics> perPattern;
+    unsigned int rngSeed = 311U; // reproducible sampling seed
     
     // NEW: Helper methods for NFA to DFA conversion
     DFA subsetConstruction(const NFA& nfa);
@@ -35,6 +38,9 @@ private:
     bool testFilenameWithDFA(const std::string& filename, std::string& matched_pattern);
     bool runDFA(const DFA& dfa, const std::string& input);
     bool checkAdditionalPatterns(const std::string& filename, std::string& matched_pattern);
+    // Tokenization discipline: current DFA is per-character; helper to expose alphabet
+    std::set<char> getAlphabetUnion() const;
+    void setSeed(unsigned int seed) { rngSeed = seed; }
 
 public:
     DFAModule();
@@ -45,7 +51,11 @@ public:
     void buildNFAs();
     void convertToDFAs();
     void minimizeDFAs();
-    void applyIGA();
+    // Hopcroft's DFA minimization (actual implementation)
+    DFA hopcroftMinimize(const DFA& dfa, int& refinementSteps, std::vector<std::set<int>>& finalPartitions);
+    
+    // Export Type-3 Regular Grammar for a pattern (V, Σ, P, S)
+    void exportRegularGrammarForPattern(size_t index, const std::string& outPath) const;
     void testPatterns();
     void generateReport();
     // Scan custom file paths using DFA modules

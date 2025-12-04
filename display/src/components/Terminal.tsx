@@ -204,8 +204,8 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
       })
     : output
 
+
   // Filter out unwanted sections and their content
-  let inUnwantedSection = false
   const unwantedSections = [
     '[TEST DATASET LABELS]',
     '[CONTEXT-FREE PROPERTY]',
@@ -215,15 +215,16 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
     '[TOKENIZATION DISCIPLINE]'
   ]
   
+  let inUnwantedSection = false
   filteredOutput = filteredOutput.filter((line) => {
     const trimmed = line.trim()
     
     // Check if this line is an unwanted section header (exact match or contains the section name)
-    const isUnwantedSection = unwantedSections.some(section => 
-      trimmed === section || trimmed.includes(section.replace(/[\[\]]/g, ''))
+    const isUnwantedSectionHeader = unwantedSections.some(section => 
+      trimmed === section || trimmed.includes(section.replace(/[[\]]/g, ''))
     )
     
-    if (isUnwantedSection) {
+    if (isUnwantedSectionHeader) {
       inUnwantedSection = true
       return false
     }
@@ -232,7 +233,7 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
     // Section headers are lines that start with [ and end with ]
     if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
       const isUnwanted = unwantedSections.some(section => 
-        trimmed === section || trimmed.includes(section.replace(/[\[\]]/g, ''))
+        trimmed === section || trimmed.includes(section.replace(/[[\]]/g, ''))
       )
       if (isUnwanted) {
         inUnwantedSection = true
@@ -250,9 +251,18 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
     }
     
     // Filter out lines that contain content from these sections even if section header wasn't caught
+    // IMPORTANT: Always allow [INFO], [SUCCESS], [ERROR], [WARN] messages through
+    const isImportantMessage = trimmed.startsWith('[INFO]') || trimmed.startsWith('[SUCCESS]') || trimmed.startsWith('[ERROR]') || trimmed.startsWith('[WARN]')
+    
+    // Skip filtering for important messages
+    if (isImportantMessage) {
+      return true
+    }
+    
+    // Filter unwanted content only from non-important lines
     if (trimmed.includes('Ground truth derived from:') ||
-        trimmed.includes('Labels:') && trimmed.includes('field indicates ground truth') ||
-        trimmed.includes('Dataset contains') && (trimmed.includes('malicious filename patterns') || trimmed.includes('TCP handshake sequences')) ||
+        (trimmed.includes('Labels:') && trimmed.includes('field indicates ground truth')) ||
+        (trimmed.includes('Dataset contains') && (trimmed.includes('malicious filename patterns') || trimmed.includes('TCP handshake sequences'))) ||
         trimmed.includes('This is a Type-2 (Context-Free) language because:') ||
         trimmed.includes('Requires STACK memory to track pairing') ||
         trimmed.includes('Cannot be recognized by DFA (Type-3)') ||
@@ -267,19 +277,19 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
         trimmed.includes('Type 3 (Regular): Fast pattern matching') ||
         trimmed.includes('Type 2 (CF): Can handle nested/paired structures') ||
         trimmed.includes('Security systems need BOTH for comprehensive detection') ||
-        // Filter tokenization discipline content
+        // Filter tokenization discipline content (only if not in important message)
         trimmed.includes('Method: Per-character tokenization') ||
         trimmed.includes('Alphabet: Printable ASCII') ||
         trimmed.includes('Processing: Sequential character-by-character') ||
-        // Filter complexity notes
-        trimmed.includes('Complexity: O(') ||
-        trimmed.includes('Complexity: O(2^') ||
-        trimmed.includes('Complexity: O(k n log n)') ||
-        trimmed.includes('Empirical:') ||
-        // Filter dataset validation output
-        (trimmed.includes('Malicious:') && trimmed.includes('Benign:')) ||
-        trimmed.includes('Unique extensions:') ||
-        trimmed.includes('Extensions:') && (trimmed.includes('exe') || trimmed.includes('bat') || trimmed.includes('scr'))) {
+        // Filter complexity notes (only standalone lines, not in important messages)
+        (trimmed.includes('Complexity: O(') && !trimmed.startsWith('[')) ||
+        (trimmed.includes('Complexity: O(2^') && !trimmed.startsWith('[')) ||
+        (trimmed.includes('Complexity: O(k n log n)') && !trimmed.startsWith('[')) ||
+        (trimmed.includes('Empirical:') && !trimmed.startsWith('[')) ||
+        // Filter dataset validation output (only if it's a standalone line, not part of [SUCCESS])
+        ((trimmed.includes('Malicious:') && trimmed.includes('Benign:')) && !trimmed.startsWith('[')) ||
+        (trimmed.includes('Unique extensions:') && !trimmed.startsWith('[')) ||
+        (trimmed.includes('Extensions:') && (trimmed.includes('exe') || trimmed.includes('bat') || trimmed.includes('scr')) && !trimmed.startsWith('['))) {
       return false
     }
     
@@ -304,7 +314,7 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
   }
 
   // Custom smooth scroll function with configurable duration
-  const smoothScrollToBottom = useCallback((duration: number = 500) => {
+  const smoothScrollToBottom = useCallback((duration: number = 250) => {
     if (!terminalRef.current || isUserScrollingRef.current) return
     
     // Cancel any existing scroll animation
@@ -338,7 +348,6 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
       const progress = Math.min(elapsed / duration, 1)
       
       // Use linear easing for very slow scrolls to make it more readable
-      // For very long durations, linear is better than ease-out
       const easing = duration > 10000 
         ? progress // Linear for very slow scrolls
         : 1 - Math.pow(1 - progress, 3) // Ease-out for faster scrolls
@@ -415,9 +424,8 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
           
           // Only scroll if not already at bottom
           if (!isAtBottom) {
-            // Use very slow custom scroll for existing content (300000ms = 5 minutes)
-            // This allows users to read the content clearly as it scrolls
-            smoothScrollToBottom(600000)
+            // Faster scroll for readability
+            smoothScrollToBottom(2000)
           }
         }
       }
@@ -427,7 +435,7 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
       const timeoutId = setTimeout(scrollToBottomSmooth, 100)
       return () => clearTimeout(timeoutId)
     }
-  }, [autoScroll, filteredOutput.length])
+  }, [autoScroll, filteredOutput.length, smoothScrollToBottom])
   
   // Also check if user manually scrolled up (disable auto-scroll if they did)
   useEffect(() => {
@@ -511,9 +519,8 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
     if (newAutoScroll && terminalRef.current && !isUserScrollingRef.current) {
       setTimeout(() => {
         if (terminalRef.current && !isUserScrollingRef.current && autoScroll) {
-          // Use very slow custom scroll for existing content (600000ms = 10 minutes)
-          // This allows users to read the content clearly as it scrolls
-          smoothScrollToBottom(600000)
+          // Faster scroll for readability
+          smoothScrollToBottom(2000)
         }
       }, 100)
     }

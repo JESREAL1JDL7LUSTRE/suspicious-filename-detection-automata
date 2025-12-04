@@ -40,23 +40,27 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    std::cout << "╔═══════════════════════════════════════════════════════════╗" << std::endl;
+    std::cout << "Starting simulator..." << std::endl;
+    std::cout << "╔══════════════════════════════════════════════════════════════╗" << std::endl;
     if (scanMode) {
-        std::cout << "║   FILE SCAN MODULE - SUSPICIOUS FILENAME DETECTION        ║" << std::endl;
+        std::cout << "║      FILE SCAN MODULE - SUSPICIOUS FILENAME DETECTION       ║" << std::endl;
     } else {
-        std::cout << "║   CS311 CHOMSKY HIERARCHY SECURITY SIMULATOR              ║" << std::endl;
-        std::cout << "║   Filename Detection & TCP Protocol Validation            ║" << std::endl;
+        std::cout << "║      CS311 CHOMSKY HIERARCHY SECURITY SIMULATOR             ║" << std::endl;
+        std::cout << "║      Filename Detection (DFA) & TCP Validation (PDA)         ║" << std::endl;
     }
-    std::cout << "╚═══════════════════════════════════════════════════════════╝" << std::endl;
+    std::cout << "╚══════════════════════════════════════════════════════════════╝" << std::endl;
     
     // ========================================================================
     // MODULE 1: DFA-based Filename Pattern Detection (Type-3 Regular)
     // ========================================================================
-    printHeader("MODULE 1: Filename Pattern Detection (DFA)");
-    std::cout << "[CHOMSKY TYPE-3: REGULAR LANGUAGE]" << std::endl;
-    std::cout << "Using Deterministic Finite Automaton (DFA)" << std::endl;
-    std::cout << "Memory: Finite-state (no unbounded stack)" << std::endl;
-    std::cout << "Capability: Pattern matching" << std::endl;
+    // MODULE 1 header (box style)
+    std::cout << "\n╔═══════════════════════════════════╗" << std::endl;
+    std::cout << "MODULE 1 — Filename Detection (DFA)" << std::endl;
+    std::cout << "╚═══════════════════════════════════╝" << std::endl;
+    std::cout << "Chomsky Type-3: Regular Language" << std::endl;
+    std::cout << "\nUses Deterministic Finite Automaton (DFA)" << std::endl;
+    std::cout << "• Memory: finite-state" << std::endl;
+    std::cout << "• Function: pattern matching" << std::endl;
     std::cout << std::endl;
     
     DFAModule dfaModule;
@@ -71,26 +75,66 @@ int main(int argc, char* argv[]) {
             dfaModule.buildNFAs();          // Regex → NFA (Thompson's Construction)
             dfaModule.convertToDFAs();       // NFA → DFA (Subset Construction)
             dfaModule.minimizeDFAs();        // DFA minimization (Hopcroft's)
-            dfaModule.applyIGA();            // Improved Grouping Algorithm
             
             // Scan the provided files (this will show file-by-file details)
             dfaModule.scanFiles(filePaths);
         } else {
-            // NORMAL MODE: Use dataset files
-            printHeader("MODULE 1: Filename Pattern Detection (DFA)");
-            std::cout << "[CHOMSKY TYPE-3: REGULAR LANGUAGE]" << std::endl;
-            std::cout << "Using Deterministic Finite Automaton (DFA)" << std::endl;
-            std::cout << "Memory: Finite-state (no unbounded stack)" << std::endl;
-            std::cout << "Capability: Pattern matching" << std::endl;
-            std::cout << std::endl;
-            
+            // NORMAL MODE: Use dataset files with structured steps
+            // 1. Dataset Loading
+            std::cout << "1. Dataset Loading" << std::endl;
+            std::cout << "[INFO] Reading dataset: archive/Malicious_file_trick_detection.jsonl" << std::endl;
             dfaModule.loadDataset("archive/Malicious_file_trick_detection.jsonl");
+            std::cout << "✓ SUCCESS — Loaded " << dfaModule.getMetrics().filenames_tested << " filenames" << std::endl;
+            std::cout << std::endl;
+
+            // 2. Regex Pattern Definition
+            std::cout << "2. Regex Pattern Definition" << std::endl;
             dfaModule.definePatterns();
-            dfaModule.buildNFAs();          // Regex → NFA (Thompson's Construction)
-            dfaModule.convertToDFAs();       // NFA → DFA (Subset Construction)
-            dfaModule.minimizeDFAs();        // DFA minimization (Hopcroft's)
-            dfaModule.applyIGA();            // Improved Grouping Algorithm
-            dfaModule.testPatterns();        // Test using actual DFAs
+
+            // 3. Regex → NFA (Thompson’s Construction)
+            std::cout << "3. Regex → NFA (Thompson’s Construction)" << std::endl;
+            dfaModule.buildNFAs();
+            std::cout << "✓ SUCCESS — Total NFA states: " << dfaModule.getMetrics().total_nfa_states << std::endl;
+            std::cout << std::endl;
+
+            // 4. NFA → DFA (Subset Construction)
+            std::cout << "4. NFA → DFA (Subset Construction)" << std::endl;
+            dfaModule.convertToDFAs();
+            std::cout << "✓ SUCCESS — Total DFA states: " << dfaModule.getMetrics().total_dfa_states_before_min << std::endl;
+            std::cout << std::endl;
+
+            // 5. DFA Minimization (Hopcroft)
+            std::cout << "5. DFA Minimization (Hopcroft)" << std::endl;
+            dfaModule.minimizeDFAs();        
+                // Export regular grammars for each pattern
+                for (size_t i = 0; i < dfaModule.getDfaCount(); ++i) {
+                    std::string path = "output/grammar_" + std::to_string(i) + ".txt";
+                    dfaModule.exportRegularGrammarForPattern(i, path);
+                    std::cout << "[OK] Wrote Regular Grammar: " << path << std::endl;
+                }
+                // Export regular grammars for each pattern
+                for (size_t i = 0; i < dfaModule.getDfaCount(); ++i) {
+                    std::string path = "output/grammar_" + std::to_string(i) + ".txt";
+                    dfaModule.exportRegularGrammarForPattern(i, path);
+                    std::cout << "[OK] Wrote Regular Grammar: " << path << std::endl;
+                }
+
+            // 6. Sample Filename Detection (Randomized)
+            std::cout << "6. Sample Filename Detection (Randomized)" << std::endl;
+            dfaModule.testPatterns();
+
+            // 7. DFA Summary
+            std::cout << "7. DFA Summary" << std::endl;
+            const auto& dfaM = dfaModule.getMetrics();
+            std::cout << "True Positives:   " << dfaM.true_positives << std::endl;
+            std::cout << "False Negatives:   " << dfaM.false_negatives << std::endl;
+            std::cout << "Accuracy:      " << dfaM.detection_accuracy << "%" << std::endl;
+            std::cout << "\nExecution Time:" << std::endl;
+            std::cout << "  Total:        " << dfaM.total_execution_time_ms << " ms" << std::endl;
+            std::cout << "  Per file:     " << dfaM.avg_matching_time_ms << " ms" << std::endl;
+            std::cout << std::endl;
+
+            // Detailed report remains available
             dfaModule.generateReport();
         }
     } catch (const std::exception& e) {
@@ -107,28 +151,53 @@ int main(int argc, char* argv[]) {
         return 0;
     }
     
-    printHeader("MODULE 2: TCP Protocol Validation (PDA)");
-    std::cout << "[CHOMSKY TYPE-2: CONTEXT-FREE LANGUAGE]" << std::endl;
-    std::cout << "Using Pushdown Automaton (PDA)" << std::endl;
-    std::cout << "Memory: Stack (unbounded)" << std::endl;
-    std::cout << "Capability: Counting, pairing, nested structures" << std::endl;
+    // MODULE 2 header (box style)
+    std::cout << "\n╔═══════════════════════════════════╗" << std::endl;
+    std::cout << "MODULE 2 — TCP Protocol Validation (PDA)" << std::endl;
+    std::cout << "╚═══════════════════════════════════╝" << std::endl;
+    std::cout << "Chomsky Type-2: Context-Free Language" << std::endl;
+    std::cout << "\nUses Pushdown Automaton (PDA)" << std::endl;
+    std::cout << "• Memory: stack" << std::endl;
+    std::cout << "• Function: sequence validation" << std::endl;
     std::cout << std::endl;
     
     PDAModule pdaModule;
     try {
+        // 1. Loading TCP Trace Dataset
+        std::cout << "1. Loading TCP Trace Dataset" << std::endl;
+        std::cout << "[INFO] Reading: archive/tcp_handshake_traces_expanded.jsonl" << std::endl;
         pdaModule.loadDataset("archive/tcp_handshake_traces_expanded.jsonl");
-        pdaModule.defineCFG();          // NEW: Show the Context-Free Grammar
+        const auto& pdaM1 = pdaModule.getMetrics();
+        std::cout << "✓ SUCCESS — Loaded " << pdaM1.total_traces << " traces" << std::endl;
+        std::cout << "Valid:   " << pdaM1.valid_traces << std::endl;
+        std::cout << "Invalid: " << pdaM1.invalid_traces << std::endl;
+        std::cout << std::endl;
+
+        // 2. CFG for TCP 3-Way Handshake
+        std::cout << "2. CFG for TCP 3-Way Handshake" << std::endl;
+        pdaModule.defineCFG();          // Show the Context-Free Grammar
+            pdaModule.printCFG();           // Canonical sets notation
+
+        // 3. PDA Structure
+        std::cout << "3. PDA Structure" << std::endl;
         pdaModule.buildPDA();           // Build PDA from CFG
+            pdaModule.exportPDAConstruction("output/pda_construction.txt");
+            std::cout << "[OK] Wrote PDA construction log: output/pda_construction.txt" << std::endl;
+
+        // 4. PDA Validation — Sample Randomized Results
+        std::cout << "4. PDA Validation — Sample Randomized Results" << std::endl;
         pdaModule.testAllTraces();      // Validate all traces
         
-        // Show sample stack operations
-        std::cout << "\n[SAMPLE STACK OPERATIONS]" << std::endl;
+        // 5. Stack Trace Examples
+        std::cout << "5. Stack Trace Examples" << std::endl;
         std::vector<std::string> sample1 = {"SYN", "SYN-ACK", "ACK"};
         pdaModule.showStackOperations(sample1);
         
         std::vector<std::string> sample2 = {"SYN", "ACK"};
         pdaModule.showStackOperations(sample2);
-        
+
+        // 6. PDA Summary
+        std::cout << "6. PDA Summary" << std::endl;
         pdaModule.generateReport();
     } catch (const std::exception& e) {
         std::cerr << "[ERROR] PDA Module failed: " << e.what() << std::endl;
@@ -315,8 +384,8 @@ int main(int argc, char* argv[]) {
     std::cout << "│ Complexity          │ O(n)             │ O(n)             │" << std::endl;
     std::cout << "└─────────────────────┴──────────────────┴──────────────────┘" << std::endl;
     
-    std::cout << "\n[EXECUTION COMPLETE]" << std::endl;
-    std::cout << "Results saved to: output/" << std::endl;
+    std::cout << "\nExecution Complete" << std::endl;
+    std::cout << "\nAll automata saved to /output/." << std::endl;
     
     return 0;
 }

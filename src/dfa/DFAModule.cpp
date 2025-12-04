@@ -13,6 +13,7 @@
 #include <queue>
 #include <map>
 #include <sstream>
+// (no extra headers needed for original implementation)
 
 namespace CS311 {
 
@@ -246,32 +247,34 @@ std::set<int> DFAModule::move(const NFA& nfa, const std::set<int>& states, char 
 }
 
 void DFAModule::minimizeDFAs() {
-    std::cout << "[INFO] Minimizing DFAs (Hopcroft's Algorithm simulation)..." << std::endl;
-    
+    std::cout << "[INFO] Minimizing DFAs (Hopcroft's Algorithm)..." << std::endl;
+
     auto start_time = std::chrono::high_resolution_clock::now();
-    
+
     minimized_dfas.clear();
-    
-    for (const auto& dfa : dfas) {
-        // Simulate minimization with ~25% reduction
-        // TODO: Replace with actual Hopcroft's algorithm implementation
-        // Actual algorithm: O(k n log n) where k = alphabet size, n = DFA states
-        DFA minimized = dfa;  // In production, implement actual Hopcroft's algorithm
-        int minimized_states = std::max(2, (int)(dfa.getStateCount() * 0.75));
-        metrics.total_dfa_states_after_min += minimized_states;
+    metrics.total_dfa_states_after_min = 0;
+
+    for (size_t i = 0; i < dfas.size(); ++i) {
+        int refinementSteps = 0;
+        std::vector<std::set<int>> finalPartitions;
+        DFA minimized = hopcroftMinimize(dfas[i], refinementSteps, finalPartitions);
         minimized_dfas.push_back(minimized);
+        metrics.total_dfa_states_after_min += minimized.getStateCount();
+
+        std::cout << "  DFA " << (i+1) << ": refinement steps = " << refinementSteps
+                  << ", final equivalence classes = " << finalPartitions.size() << std::endl;
     }
     
     auto end_time = std::chrono::high_resolution_clock::now();
     auto total_dur = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
     
     if (metrics.total_dfa_states_before_min > 0) {
-        metrics.state_reduction_min_percent = 
-            ((double)(metrics.total_dfa_states_before_min - metrics.total_dfa_states_after_min) / 
+        metrics.state_reduction_min_percent =
+            ((double)(metrics.total_dfa_states_before_min - metrics.total_dfa_states_after_min) /
              metrics.total_dfa_states_before_min) * 100.0;
     }
-    
-    std::cout << "[SUCCESS] Minimized DFAs" << std::endl;
+
+    std::cout << "[SUCCESS] Minimized DFAs (Hopcroft)" << std::endl;
     std::cout << "  States after minimization: " << metrics.total_dfa_states_after_min << std::endl;
     std::cout << "  Reduction: " << metrics.state_reduction_min_percent << "%" << std::endl;
     std::cout << "  Total time: " << total_dur.count() << " μs" << std::endl;
@@ -279,45 +282,6 @@ void DFAModule::minimizeDFAs() {
     std::cout << "  Empirical: " << metrics.total_dfa_states_before_min << " states → " 
              << metrics.total_dfa_states_after_min << " states" << std::endl;
     std::cout << std::endl;
-}
-
-void DFAModule::applyIGA() {
-    std::cout << "[INFO] Applying IGA (Improved Grouping Algorithm)..." << std::endl;
-    
-    // IGA Parameters (for reproducibility)
-    const int EC_THRESHOLD = 2;  // Equivalence Class threshold
-    const int SIZE_LIMIT = 10;   // Maximum group size limit
-    
-    grouped_dfas = minimized_dfas;
-    
-    // Simulate IGA with ~27% additional reduction
-    metrics.total_dfa_states_after_iga = (int)(metrics.total_dfa_states_after_min * 0.73);
-    
-    if (metrics.total_dfa_states_after_min > 0) {
-        metrics.state_reduction_iga_percent = 
-            ((double)(metrics.total_dfa_states_after_min - metrics.total_dfa_states_after_iga) / 
-             metrics.total_dfa_states_after_min) * 100.0;
-    }
-    
-    if (metrics.total_dfa_states_before_min > 0) {
-        metrics.total_reduction_percent = 
-            ((double)(metrics.total_dfa_states_before_min - metrics.total_dfa_states_after_iga) / 
-             metrics.total_dfa_states_before_min) * 100.0;
-    }
-    
-    std::cout << "[IGA PARAMETERS]" << std::endl;
-    std::cout << "  EC Threshold: " << EC_THRESHOLD << std::endl;
-    std::cout << "  Size Limit:   " << SIZE_LIMIT << std::endl;
-    
-    std::cout << "\n[PATTERN → GROUP MAPPING]" << std::endl;
-    for (size_t i = 0; i < pattern_names.size() && i < grouped_dfas.size(); ++i) {
-        std::cout << "  Group " << i << ": Pattern '" << regex_patterns[i] 
-                  << "' (" << pattern_names[i] << ") → DFA " << i << std::endl;
-    }
-    
-    std::cout << "\n[SUCCESS] IGA complete" << std::endl;
-    std::cout << "  Final state count: " << metrics.total_dfa_states_after_iga << std::endl;
-    std::cout << "  Total reduction: " << metrics.total_reduction_percent << "%\n" << std::endl;
 }
 
 void DFAModule::testPatterns() {
@@ -333,6 +297,13 @@ void DFAModule::testPatterns() {
     for (const auto& entry : dataset) {
         std::string matched;
         bool detected = testFilenameWithDFA(entry.filename, matched);
+        // Update per-pattern metrics
+        if (!matched.empty()) {
+            auto& pm = perPattern[matched];
+            if (detected && entry.is_malicious) pm.tp++; else
+            if (detected && !entry.is_malicious) pm.fp++; else
+            if (!detected && entry.is_malicious) pm.fn++; else pm.tn++;
+        }
         
         if (detected && entry.is_malicious) {
             metrics.true_positives++;
@@ -356,6 +327,17 @@ void DFAModule::testPatterns() {
     if (dataset.size() > 0) {
         metrics.avg_matching_time_ms = metrics.total_execution_time_ms / dataset.size();
         metrics.detection_accuracy = ((double)metrics.true_positives / dataset.size()) * 100.0;
+    }
+
+    // Compute macro metrics per pattern
+    for (auto& kv : perPattern) {
+        auto& pm = kv.second;
+        double precision = (pm.tp + pm.fp) ? (100.0 * pm.tp / (pm.tp + pm.fp)) : 0.0;
+        double recall = (pm.tp + pm.fn) ? (100.0 * pm.tp / (pm.tp + pm.fn)) : 0.0;
+        double f1 = (precision + recall) ? (2.0 * precision * recall / (precision + recall)) : 0.0;
+        pm.precision = precision;
+        pm.recall = recall;
+        pm.f1 = f1;
     }
     
     std::cout << "[SUCCESS] Testing complete" << std::endl;
@@ -385,8 +367,8 @@ bool DFAModule::testFilenameWithDFA(const std::string& filename, std::string& ma
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
     
     // Test against all DFAs
-    for (size_t i = 0; i < grouped_dfas.size() && i < pattern_names.size(); i++) {
-        if (runDFA(grouped_dfas[i], lower)) {
+    for (size_t i = 0; i < minimized_dfas.size() && i < pattern_names.size(); i++) {
+        if (runDFA(minimized_dfas[i], lower)) {
             matched_pattern = pattern_names[i];
             return true;
         }
@@ -442,7 +424,7 @@ void DFAModule::generateReport() {
     std::cout << "║          DFA MODULE - DETECTION RESULTS                   ║" << std::endl;
     std::cout << "╚═══════════════════════════════════════════════════════════╝" << std::endl;
     
-    // Show sample filename results
+    // Show sample filename results (deterministic order)
     std::cout << "\n[SAMPLE FILENAME RESULTS (RANDOMIZED)]" << std::endl;
     int sample_count = 0;
     for (const auto& entry : dataset) {
@@ -456,7 +438,7 @@ void DFAModule::generateReport() {
         sample_count++;
     }
     
-    // Calculate confusion matrix metrics
+    // Calculate confusion matrix metrics (micro-average)
     int true_negatives = metrics.filenames_tested - metrics.true_positives - metrics.false_positives - metrics.false_negatives;
     double precision = (metrics.true_positives + metrics.false_positives > 0) 
         ? (100.0 * metrics.true_positives / (metrics.true_positives + metrics.false_positives)) : 0.0;
@@ -480,18 +462,21 @@ void DFAModule::generateReport() {
     std::cout << "  F1 Score:                " << f1_score << "%" << std::endl;
     std::cout << "  Detection Rate:          " << metrics.detection_accuracy << "%" << std::endl;
     
+    std::cout << "\n[TOKENIZATION]" << std::endl;
+    std::set<char> Sigma = getAlphabetUnion();
+    std::cout << "  Mode: per-character DFA" << std::endl;
+    std::cout << "  Alphabet (Σ): { ";
+    bool first=true; for (char c : Sigma){ if(!first) std::cout<<", "; std::cout<<c; first=false; }
+    std::cout << " }" << std::endl;
+
     std::cout << "\n[STATE REDUCTION]" << std::endl;
     std::cout << "  Original DFA states:    " << metrics.total_dfa_states_before_min << std::endl;
     std::cout << "  After Minimization:     " << metrics.total_dfa_states_after_min 
              << " (-" << metrics.state_reduction_min_percent << "% vs original)" << std::endl;
-    std::cout << "  After IGA:              " << metrics.total_dfa_states_after_iga 
-             << " (-" << metrics.state_reduction_iga_percent << "% vs minimized, -" 
-             << metrics.total_reduction_percent << "% vs original)" << std::endl;
-    std::cout << "  Total Reduction:        " << metrics.total_reduction_percent << "% (vs original)" << std::endl;
     
     // Calculate memory usage (approximate)
     size_t memory_bytes = 0;
-    for (const auto& dfa : grouped_dfas) {
+    for (const auto& dfa : minimized_dfas) {
         // States: each state has id, bool, string (approx 24 bytes per state)
         memory_bytes += dfa.states.size() * 24;
         // Transition table: each entry is pair<int,char> -> int (approx 16 bytes)
@@ -510,10 +495,25 @@ void DFAModule::generateReport() {
     std::cout << "  Average per file:       " << metrics.avg_matching_time_ms << " ms" << std::endl;
     std::cout << "  Note: Times measured using std::chrono::high_resolution_clock" << std::endl;
     
-    std::cout << "\n[IGA PATTERN → GROUP MAPPING]" << std::endl;
-    for (size_t i = 0; i < pattern_names.size() && i < grouped_dfas.size(); ++i) {
-        std::cout << "  Group " << i << ": Pattern '" << regex_patterns[i] 
+    std::cout << "\n[PATTERN → DFA MAPPING]" << std::endl;
+    for (size_t i = 0; i < pattern_names.size() && i < minimized_dfas.size(); ++i) {
+        std::cout << "  Pattern '" << regex_patterns[i] 
                   << "' (" << pattern_names[i] << ") → DFA " << i << std::endl;
+    }
+    // Per-pattern metrics (macro view)
+    if (!perPattern.empty()) {
+        std::cout << "\n[PER-PATTERN METRICS]" << std::endl;
+        for (size_t i = 0; i < pattern_names.size(); ++i) {
+            const auto& name = pattern_names[i];
+            if (perPattern.count(name)) {
+                const auto& pm = perPattern.at(name);
+                std::cout << "  " << name << ": TP=" << pm.tp << ", FP=" << pm.fp
+                          << ", FN=" << pm.fn << ", TN=" << pm.tn
+                          << ", precision=" << pm.precision << "%"
+                          << ", recall=" << pm.recall << "%"
+                          << ", F1=" << pm.f1 << "%" << std::endl;
+            }
+        }
     }
     std::cout << std::endl;
 
@@ -553,12 +553,9 @@ void DFAModule::generateReport() {
             out << "\n[STATE REDUCTION]\n";
             out << "  Original DFA states:    " << metrics.total_dfa_states_before_min << "\n";
             out << "  After Minimization:     " << metrics.total_dfa_states_after_min << " (-" << metrics.state_reduction_min_percent << "% vs original)\n";
-            out << "  After IGA:              " << metrics.total_dfa_states_after_iga << " (-" << metrics.state_reduction_iga_percent << "% vs minimized, -" 
-                << metrics.total_reduction_percent << "% vs original)\n";
-            out << "  Total Reduction:        " << metrics.total_reduction_percent << "% (vs original)\n";
-            out << "\n[IGA PATTERN → GROUP MAPPING]\n";
-            for (size_t i = 0; i < pattern_names.size() && i < grouped_dfas.size(); ++i) {
-                out << "  Group " << i << ": Pattern '" << regex_patterns[i] 
+            out << "\n[PATTERN → DFA MAPPING]\n";
+            for (size_t i = 0; i < pattern_names.size() && i < minimized_dfas.size(); ++i) {
+                out << "  Pattern '" << regex_patterns[i] 
                     << "' (" << pattern_names[i] << ") → DFA " << i << "\n";
             }
             out << "\n[RESOURCE METRICS]\n";
@@ -578,10 +575,10 @@ void DFAModule::generateReport() {
 // Export Graphviz DOT representing all grouped DFAs (one cluster per pattern)
 std::string DFAModule::exportGraphvizAll() const {
     std::ostringstream ss;
-    if (grouped_dfas.empty()) return ss.str();
+    if (minimized_dfas.empty()) return ss.str();
 
-    for (size_t i = 0; i < grouped_dfas.size(); ++i) {
-        const DFA& dfa = grouped_dfas[i];
+    for (size_t i = 0; i < minimized_dfas.size(); ++i) {
+        const DFA& dfa = minimized_dfas[i];
         std::string cluster = "cluster_dfa_" + std::to_string(i);
         ss << "  subgraph " << cluster << " {\n";
         ss << "    label=\"" << (i < pattern_names.size() ? pattern_names[i] : (std::string("dfa_") + std::to_string(i))) << "\";\n";
@@ -618,9 +615,9 @@ std::string DFAModule::exportGraphvizAll() const {
 // Export a single DFA cluster by index
 std::string DFAModule::exportGraphvizFor(size_t index) const {
     std::ostringstream ss;
-    if (index >= grouped_dfas.size()) return ss.str();
+    if (index >= minimized_dfas.size()) return ss.str();
 
-    const DFA& dfa = grouped_dfas[index];
+    const DFA& dfa = minimized_dfas[index];
     std::string patternName = (index < pattern_names.size()) ? pattern_names[index] : (std::string("dfa_") + std::to_string(index));
     std::string regexPattern = (index < regex_patterns.size()) ? regex_patterns[index] : "";
     
@@ -656,17 +653,16 @@ std::string DFAModule::exportGraphvizFor(size_t index) const {
 }
 
 size_t DFAModule::getDfaCount() const {
-    return grouped_dfas.size();
+    return minimized_dfas.size();
 }
 
 void DFAModule::scanFiles(const std::vector<std::string>& filePaths) {
     // Build DFAs silently (no verbose output during initialization)
-    if (grouped_dfas.empty()) {
+    if (minimized_dfas.empty()) {
         definePatterns();
         buildNFAs();
         convertToDFAs();
         minimizeDFAs();
-        applyIGA();
     }
     
     // Show scan header
@@ -803,18 +799,187 @@ void DFAModule::generateScanReport(const std::vector<std::string>& filePaths,
     std::cout << "  Detection rate:     " << (filePaths.size() > 0 ? (100.0 * suspiciousCount / filePaths.size()) : 0.0) << "%" << std::endl;
     std::cout << "  Patterns used:       " << pattern_names.size() << std::endl;
     
-    std::cout << "\n[PATTERN → GROUP MAPPING]" << std::endl;
-    for (size_t i = 0; i < pattern_names.size() && i < grouped_dfas.size(); ++i) {
-        std::cout << "  Group " << i << ": Pattern '" << regex_patterns[i] 
+    std::cout << "\n[PATTERN → DFA MAPPING]" << std::endl;
+    for (size_t i = 0; i < pattern_names.size() && i < minimized_dfas.size(); ++i) {
+        std::cout << "  Pattern '" << regex_patterns[i] 
                   << "' (" << pattern_names[i] << ") → DFA " << i << std::endl;
     }
     
     std::cout << "\n[DFA MODULE INFO]" << std::endl;
     std::cout << "  Using actual DFA automata for pattern matching" << std::endl;
-    std::cout << "  Total DFA states:   " << metrics.total_dfa_states_after_iga << std::endl;
+    std::cout << "  Total DFA states:   " << metrics.total_dfa_states_after_min << std::endl;
     std::cout << "  Memory: Finite-state (no unbounded stack)" << std::endl;
     std::cout << "  Chomsky Type: Type-3 (Regular Language)" << std::endl;
     std::cout << std::endl;
+}
+
+// Union of alphabet symbols across minimized DFAs (per-character mode)
+std::set<char> DFAModule::getAlphabetUnion() const {
+    std::set<char> Sigma;
+    for (const auto& dfa : minimized_dfas) {
+        for (char c : dfa.alphabet) Sigma.insert(c);
+    }
+    return Sigma;
+}
+
+// Hopcroft's DFA minimization: builds minimized DFA preserving language equivalence
+DFA DFAModule::hopcroftMinimize(const DFA& dfa, int& refinementSteps, std::vector<std::set<int>>& finalPartitions) {
+    refinementSteps = 0;
+    finalPartitions.clear();
+
+    // If DFA has no states or alphabet, return as-is
+    if (dfa.states.empty()) return dfa;
+
+    // Collect state set Q and alphabet Σ
+    std::set<int> Q;
+    for (const auto& s : dfa.states) Q.insert(s.id);
+    std::set<char> Sigma = dfa.alphabet;
+    if (Sigma.empty()) Sigma.insert('\0');
+
+    // Initial partition: accepting vs non-accepting
+    std::set<int> F = dfa.accepting_states;
+    std::set<int> NF;
+    for (int q : Q) if (!F.count(q)) NF.insert(q);
+
+    std::vector<std::set<int>> P;
+    if (!F.empty()) P.push_back(F);
+    if (!NF.empty()) P.push_back(NF);
+
+    // Worklist W initialized with same as P
+    std::vector<std::set<int>> W = P;
+
+    auto splitPartition = [&](const std::set<int>& A, char a){
+        // X = states in any S that transition on a into A
+        std::set<int> X;
+        for (int s : Q) {
+            int t = dfa.getNextState(s, a);
+            if (t != -1 && A.count(t)) X.insert(s);
+        }
+        return X;
+    };
+
+    while (!W.empty()) {
+        std::set<int> A = W.back();
+        W.pop_back();
+        for (char a : Sigma) {
+            std::set<int> X = splitPartition(A, a);
+            std::vector<std::set<int>> Pnext;
+            bool changed = false;
+            for (const auto& Y : P) {
+                // Y ∩ X and Y \ X
+                std::set<int> inter; for (int y : Y) if (X.count(y)) inter.insert(y);
+                std::set<int> diff; for (int y : Y) if (!X.count(y)) diff.insert(y);
+                if (!inter.empty() && !diff.empty()) {
+                    changed = true;
+                    Pnext.push_back(inter);
+                    Pnext.push_back(diff);
+                    // Update worklist
+                    bool inW = false;
+                    for (const auto& w : W) { if (w == Y) { inW = true; break; } }
+                    if (inW) {
+                        // replace Y in W by inter and diff
+                        // remove Y
+                        std::vector<std::set<int>> Wnew;
+                        for (auto& w : W) if (!(w == Y)) Wnew.push_back(w);
+                        W = Wnew;
+                        W.push_back(inter);
+                        W.push_back(diff);
+                    } else {
+                        // add smaller part
+                        if (inter.size() <= diff.size()) W.push_back(inter); else W.push_back(diff);
+                    }
+                } else {
+                    Pnext.push_back(Y);
+                }
+            }
+            if (changed) {
+                refinementSteps++;
+                P = std::move(Pnext);
+            }
+        }
+    }
+
+    finalPartitions = P;
+
+    // Build minimized DFA: each partition becomes one state; map old->new
+    std::map<int,int> stateMap; // old id -> new id
+    DFA M;
+    int newId = 0;
+    for (const auto& part : P) {
+        bool accepting = false;
+        std::string label = "";
+        for (int s : part) { if (dfa.accepting_states.count(s)) { accepting = true; break; } }
+        M.addState(State(newId, accepting, label));
+        if (accepting) M.accepting_states.insert(newId);
+        // Map all old states in this partition to newId
+        for (int s : part) stateMap[s] = newId;
+        newId++;
+    }
+
+    // Start state is the partition containing original start
+    int startOld = dfa.start_state;
+    M.start_state = stateMap.count(startOld) ? stateMap[startOld] : 0;
+
+    // Build transitions between new states
+    for (const auto& part : P) {
+        if (part.empty()) continue;
+        int repr = *part.begin(); // representative old state
+        int fromNew = stateMap[repr];
+        for (char a : Sigma) {
+            int toOld = dfa.getNextState(repr, a);
+            if (toOld != -1 && stateMap.count(toOld)) {
+                int toNew = stateMap[toOld];
+                M.addTransition(fromNew, a, toNew);
+            }
+        }
+    }
+
+    // Alphabet
+    for (char a : Sigma) M.alphabet.insert(a);
+
+    return M;
+}
+
+// Export a very simple Type-3 (right-linear) grammar approximating the regex pattern
+void DFAModule::exportRegularGrammarForPattern(size_t index, const std::string& outPath) const {
+    if (index >= regex_patterns.size() || index >= pattern_names.size()) return;
+    std::ofstream out(outPath);
+    if (!out.is_open()) return;
+
+    const std::string& pat = regex_patterns[index];
+    const std::string& name = pattern_names[index];
+
+    // Canonical sets
+    out << "# Type-3 Regular Grammar for pattern '" << pat << "' (" << name << ")\n";
+    out << "V = { S";
+    for (size_t i = 0; i < pat.size(); ++i) out << ", A" << i;
+    out << " }\n";
+    // Alphabet: unique chars from pattern (approximation)
+    std::set<char> Sigma;
+    for (char c : pat) if (c != '\\') Sigma.insert(c);
+    out << "Σ = { ";
+    bool first=true; for (char c : Sigma){ if(!first) out<<", "; out<<c; first=false; }
+    out << " }\n";
+    out << "S = S\n";
+    out << "P:\n";
+    // Simple chain productions matching literal pat: S -> c A0, A0 -> c A1, ..., Ak -> ε
+    for (size_t i = 0; i < pat.size(); ++i) {
+        char c = pat[i];
+        std::string Ai = (i==0?"S":"A"+std::to_string(i-1));
+        std::string Aj = (i+1<pat.size()?"A"+std::to_string(i):"A"+std::to_string(i));
+        out << "  " << Ai << " → " << c << " " << Aj << "\n";
+    }
+    out << "  A" << (pat.empty()?0:pat.size()-1) << " → ε\n";
+
+    // Derivation example for the literal pattern itself
+    out << "\n# Sample derivation (literal pattern)\n";
+    out << "S ⇒ ";
+    for (size_t i = 0; i < pat.size(); ++i) {
+        out << pat[i];
+        if (i+1<pat.size()) out << " A" << i;
+    }
+    out << " ⇒* " << pat << "\n";
+    out.close();
 }
 
 } // namespace CS311

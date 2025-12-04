@@ -1,5 +1,6 @@
 {
     "files.associations": {
+        ".fantomasignore": "ignore",
         "*.tsx": "typescriptreact",
         "chrono": "cpp",
         "iostream": "cpp",
@@ -11,7 +12,8 @@
         "fstream": "cpp",
         "map": "cpp",
         "sstream": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "xstring": "cpp"
     },
     "claudeCodeChat.permissions.yoloMode": false
 }
