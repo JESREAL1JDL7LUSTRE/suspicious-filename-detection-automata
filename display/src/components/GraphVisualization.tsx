@@ -1,13 +1,14 @@
 import { useMemo } from 'react'
-import ReactFlow, { Background, Controls, MiniMap, ReactFlowProvider } from 'reactflow'
+import ReactFlow, { Background, Controls, MiniMap, ReactFlowProvider, MarkerType, type Edge } from 'reactflow'
 import type { Node } from 'reactflow'
 import 'reactflow/dist/style.css'
 import type { Graph } from '../parser/json'
 import type { ScanResult, VisitedState } from '../hooks/useFileScan'
 
 // Memoize nodeTypes and edgeTypes outside component to avoid React Flow warning
-const nodeTypes = {}
-const edgeTypes = {}
+// These are empty objects because we're using default node/edge types from ReactFlow
+const nodeTypes: Record<string, never> = {}
+const edgeTypes: Record<string, never> = {}
 
 interface GraphVisualizationProps {
   graph: Graph
@@ -184,6 +185,98 @@ export function GraphVisualization({
     })
   }, [graph.nodes, visitedStates, isScanMode])
 
+  // Style edges with arrow heads, curved paths, and dynamic coloring
+  const styledEdges = useMemo(() => {
+    // Create a set of visited state IDs for quick lookup
+    const visitedStateIds = new Set(visitedStates.map(vs => vs.stateId))
+    
+    // Create a map of visited states with their colors (most recent visit wins)
+    // Use the same logic as coloredNodes for consistency
+    const stateVisitMap = new Map<string, { status: 'suspicious' | 'safe', severity: 'high' | 'medium' | 'low' | 'safe', timestamp: number }>()
+    for (const visitedState of visitedStates) {
+      const existing = stateVisitMap.get(visitedState.stateId)
+      if (!existing || visitedState.timestamp > existing.timestamp) {
+        stateVisitMap.set(visitedState.stateId, {
+          status: visitedState.status,
+          severity: visitedState.severity || 'safe',
+          timestamp: visitedState.timestamp
+        })
+      }
+    }
+    
+    // Build color map from stateVisitMap
+    const stateColorMap = new Map<string, string>()
+    for (const [stateId, info] of stateVisitMap.entries()) {
+      if (info.status === 'suspicious') {
+        const color = info.severity === 'high' ? '#ef4444' : // red
+                     info.severity === 'medium' ? '#eab308' : // yellow
+                     '#f97316' // orange
+        stateColorMap.set(stateId, color)
+      } else {
+        stateColorMap.set(stateId, '#3b82f6') // blue
+      }
+    }
+    
+    return graph.edges.map((edge: Edge) => {
+      // Extract state IDs from source and target
+      const sourceStateMatch = edge.source.match(/q?(\d+)/i)
+      const targetStateMatch = edge.target.match(/q?(\d+)/i)
+      const sourceStateId = sourceStateMatch ? `q${sourceStateMatch[1]}` : null
+      const targetStateId = targetStateMatch ? `q${targetStateMatch[1]}` : null
+      
+      // Check if this edge connects visited states
+      const sourceVisited = sourceStateId && visitedStateIds.has(sourceStateId)
+      const targetVisited = targetStateId && visitedStateIds.has(targetStateId)
+      const isVisitedEdge = sourceVisited && targetVisited
+      
+      // Determine edge color based on visited state
+      let edgeColor = '#64748b' // Default gray
+      const strokeWidth = 1.5 // Slim lines so they feel like moving dots when animated
+      const arrowSize = 14 // Slightly larger arrow head
+      
+      if (isVisitedEdge && isScanMode && targetStateId) {
+        // Use target state color (where the transition leads)
+        const targetColor = stateColorMap.get(targetStateId)
+        if (targetColor) {
+          edgeColor = targetColor
+        }
+      }
+      
+      return {
+        ...edge,
+        type: 'default', // Classic bezier-style curve
+        animated: isVisitedEdge && isScanMode, // Only visited transitions get motion
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          width: arrowSize,
+          height: arrowSize,
+          color: edgeColor
+        },
+        style: {
+          strokeWidth: strokeWidth,
+          stroke: edgeColor,
+          transition: 'stroke 0.3s ease, stroke-width 0.3s ease' // Smooth color transitions
+        },
+        labelStyle: {
+          fill: '#374151', // Dark gray for label text
+          fontWeight: 600,
+          fontSize: 13,
+          background: '#ffffff',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          border: `1px solid ${edgeColor}80`
+        },
+        labelBgStyle: {
+          fill: '#ffffff', // White background for label
+          fillOpacity: 0.9,
+          stroke: edgeColor,
+          strokeWidth: 1,
+          strokeOpacity: 0.3
+        }
+      }
+    })
+  }, [graph.edges, visitedStates, isScanMode])
+
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="mb-2 text-sm text-gray-600 shrink-0">
@@ -207,10 +300,24 @@ export function GraphVisualization({
             <div style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
               <ReactFlow 
                 nodes={coloredNodes} 
-                edges={graph.edges} 
+                edges={styledEdges} 
                 fitView
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
+                defaultEdgeOptions={{
+                  type: 'default', // Classic bezier-style curve
+                  animated: false,
+                  markerEnd: {
+                    type: MarkerType.ArrowClosed,
+                    width: 14,
+                    height: 14,
+                    color: '#64748b'
+                  },
+                  style: {
+                    strokeWidth: 1.5,
+                    stroke: '#64748b'
+                  }
+                }}
               >
                 <MiniMap />
                 <Controls />

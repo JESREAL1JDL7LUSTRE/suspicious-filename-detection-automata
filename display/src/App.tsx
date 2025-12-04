@@ -97,7 +97,7 @@ function App() {
               isRunning={isRunning}
               scanResults={fileScan.scanResults}
               visitedStates={fileScan.visitedStates}
-              isScanMode={mode === 'scan' && fileScan.scanResults.length > 0}
+              isScanMode={mode === 'scan' && (fileScan.isScanning || fileScan.scanResults.length > 0)}
               totalFiles={selectedFiles.length}
             />
           </div>

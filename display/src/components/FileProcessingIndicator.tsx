@@ -32,7 +32,7 @@ export function FileProcessingIndicator({
     const allText = terminalOutput.join('')
     
     // Debug: log terminal output to see what we're parsing (only in development)
-    if (terminalOutput.length > 0 && isScanning && process.env.NODE_ENV === 'development') {
+    if (terminalOutput.length > 0 && isScanning && import.meta.env.DEV) {
       console.log('FileProcessingIndicator - Terminal output chunks:', terminalOutput.length)
       const lastChunk = terminalOutput[terminalOutput.length - 1]
       if (lastChunk) {
@@ -128,7 +128,7 @@ export function FileProcessingIndicator({
   let currentResult: ScanResult | null = null
   if (currentFileName) {
     // First try to find by exact filename match
-    currentResult = scanResults.find(r => r.file === currentFileName)
+    currentResult = scanResults.find(r => r.file === currentFileName) || null
     
     // If not found, try partial match
     if (!currentResult) {
@@ -137,18 +137,18 @@ export function FileProcessingIndicator({
         currentFileName.includes(r.file) ||
         r.path.includes(currentFileName) ||
         currentFileName.includes(r.path)
-      )
+      ) || null
     }
     
     // If still not found, try by index (currentFileIndex is 1-based, scanResults is 0-based)
     if (!currentResult && currentFileIndex > 0 && currentFileIndex <= scanResults.length) {
-      currentResult = scanResults[currentFileIndex - 1]
+      currentResult = scanResults[currentFileIndex - 1] || null
     }
   }
   
   // Fallback to most recent result
   if (!currentResult && scanResults.length > 0) {
-    currentResult = scanResults[scanResults.length - 1]
+    currentResult = scanResults[scanResults.length - 1] || null
   }
 
   const getStatusColor = (status: string, severity?: string) => {

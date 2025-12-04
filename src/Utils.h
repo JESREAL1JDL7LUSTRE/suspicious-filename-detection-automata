@@ -71,11 +71,13 @@ struct DFA {
             current = getNextState(current, c);
             if (verbose && prev_state != -1) {
                 std::cout << "  State: q" << prev_state << " → q" << current << " (symbol: '" << c << "')" << std::endl;
+                std::cout.flush(); // Flush immediately so frontend receives it in real-time
             }
             if (current == -1) return false;
         }
         if (verbose && current != -1) {
             std::cout << "  Final state: q" << current << std::endl;
+            std::cout.flush(); // Flush immediately so frontend receives it in real-time
         }
         return accepting_states.count(current) > 0;
     }
