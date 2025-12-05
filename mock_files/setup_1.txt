@@ -1,0 +1,7 @@
+[PATTERN -> DFA MAPPING]
+Pattern: setup
+Description: deceptive_setup
+DFA ID: 7
+Instance: 1
+
+SAFE MOCK FILE — contains no real executable code.

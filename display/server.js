@@ -244,12 +244,12 @@ app.post('/api/scan', async (req, res) => {
   try {
     // Prepare file paths as command-line arguments
     // Escape paths with spaces for Windows
-    const args = filePaths.map(path => {
+    const args = ['--dfa-verbose', ...filePaths.map(path => {
       if (path.includes(' ')) {
         return `"${path}"`
       }
       return path
-    })
+    })]
     
     console.log(`Spawning simulator for scan with ${args.length} files`)
     

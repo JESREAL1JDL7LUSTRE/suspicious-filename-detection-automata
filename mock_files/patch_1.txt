@@ -1,0 +1,7 @@
+[PATTERN -> DFA MAPPING]
+Pattern: patch
+Description: deceptive_patch
+DFA ID: 8
+Instance: 1
+
+SAFE MOCK FILE — contains no real executable code.

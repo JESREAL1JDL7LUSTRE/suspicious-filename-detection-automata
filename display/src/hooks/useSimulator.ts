@@ -104,7 +104,7 @@ export function useSimulator(onComplete?: () => void) {
                     
                     // Filter out duplicate "Starting simulator" messages from stdout/stderr
                     // (C++ program also outputs this, but server already sends it as 'start' message)
-                    const filteredLines = lines.filter(line => {
+                    const filteredLines = lines.filter((line: string) => {
                       const trimmed = line.trim().toLowerCase()
                       // Skip if it's a duplicate "Starting simulator" message
                       return !(trimmed === 'starting simulator...' || trimmed === 'starting simulator')
@@ -134,13 +134,13 @@ export function useSimulator(onComplete?: () => void) {
                   } else if (data.type === 'start') {
                     // Split start message by newlines and filter empty lines
                     const message = data.message || ''
-                    const lines = message.split(/\r?\n/).filter(line => line.trim().length > 0)
+                    const lines = message.split(/\r?\n/).filter((line:string) => line.trim().length > 0)
                     // Only add if we have lines and avoid duplicates
                     if (lines.length > 0) {
                       setTerminalOutput((prev) => {
                         // Check if any of the new lines already exist in the last few lines to avoid duplicates
                         const lastFewLines = prev.slice(-3) // Check last 3 lines
-                        const newLinesToAdd = lines.filter(newLine => {
+                        const newLinesToAdd = lines.filter((newLine: string) => {
                           // Skip if this line already exists in recent output
                           return !lastFewLines.some(existingLine => 
                             existingLine.trim() === newLine.trim() || 

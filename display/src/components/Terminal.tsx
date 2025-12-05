@@ -186,21 +186,35 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
   const hasInitializedRef = useRef<boolean>(false)
   const isUserScrollingRef = useRef<boolean>(false)
   const scrollAnimationFrameRef = useRef<number | null>(null)
-  const isProgrammaticScrollRef = useRef<boolean>(false)
+  const isProgrammaticScrollRef = useRef  <boolean>(false)
   
-  // Filter output in scan mode to show only file processing details
+  // Filter output in scan mode to show file processing and state transitions
   let filteredOutput = scanMode && isRunning
     ? output.filter((line) => {
         const trimmed = line.trim()
         const parsed = parseLine(line)
         
-        // Show file processing related lines
-        const isFileProcessing = parsed.type === 'file_processing' || 
-                                 parsed.type === 'info' && (trimmed.includes('Analyzing') || trimmed.includes('Pattern match') || trimmed.includes('Total files') || trimmed.includes('Loaded detection')) ||
-                                 parsed.type === 'success' && trimmed.includes('Result:') ||
-                                 parsed.type === 'header' && trimmed.includes('FILE SCAN')
+        // In scan mode, show:
+        // 1. File processing lines
+        // 2. State transitions (CRITICAL for visualization)
+        // 3. Headers and important info
+        // 4. Results
+        const isRelevantInScanMode = 
+          parsed.type === 'file_processing' || 
+          parsed.type === 'state_transition' ||  // KEEP STATE TRANSITIONS
+          parsed.type === 'final_state' ||       // KEEP FINAL STATES
+          parsed.type === 'header' ||
+          (parsed.type === 'info' && (
+            trimmed.includes('Analyzing') || 
+            trimmed.includes('Pattern match') || 
+            trimmed.includes('Total files') || 
+            trimmed.includes('Loaded detection') ||
+            trimmed.includes('Starting DFA') ||
+            trimmed.includes('FILE SCAN')
+          )) ||
+          (parsed.type === 'success' && trimmed.includes('Result:'))
         
-        return isFileProcessing || parsed.type === 'header' || parsed.type === 'file_processing'
+        return isRelevantInScanMode
       })
     : output
 

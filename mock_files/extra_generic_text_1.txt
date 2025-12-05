@@ -1,0 +1,6 @@
+[EXTRA MOCK FILE]
+Category: generic_text
+Extension: .txt
+Instance: 1
+
+SAFE MOCK FILE — just placeholder text.

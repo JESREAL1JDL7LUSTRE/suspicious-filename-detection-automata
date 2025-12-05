@@ -13,6 +13,8 @@
 #include <stack>
 #include <utility>
 #include <iostream>
+#include <chrono>      // ADD THIS
+#include <thread> 
 
 namespace CS311 {
 
@@ -65,54 +67,74 @@ struct DFA {
     int getStateCount() const { return states.size(); }
     bool accepts(const std::string& input, bool verbose = false) const {
         int current = start_state;
-        int prev_state = start_state;
         
         // SOUNDNESS CHECK: Verify start_state is valid
         if (start_state < 0 || start_state >= (int)states.size()) {
             std::cerr << "[INVARIANT VIOLATION] Invalid start state: " << start_state 
-                     << " (valid range: 0-" << (states.size()-1) << ")" << std::endl;
+                    << " (valid range: 0-" << (states.size()-1) << ")" << std::endl;
             return false;
         }
         
-        for (char c : input) {
-            prev_state = current;
-            current = getNextState(current, c);
+        if (verbose) {
+            std::cout << "  → Starting DFA simulation from state q" << current << std::endl;
+            std::cout.flush();
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+        
+        for (size_t i = 0; i < input.size(); ++i) {
+            char symbol = input[i];
+            int prev_state = current;
+            int next = getNextState(current, symbol);
             
-            // SOUNDNESS CHECK: Verify current state is in Q (set of states)
-            if (current != -1) {
-                bool state_exists = false;
-                for (const auto& s : states) {
-                    if (s.id == current) {
-                        state_exists = true;
-                        break;
-                    }
+            if (next == -1) {
+                if (verbose) {
+                    std::cout << "  → No transition from q" << current 
+                            << " on '" << symbol << "' - REJECTED" << std::endl;
+                    std::cout.flush();
                 }
-                if (!state_exists) {
-                    std::cerr << "[INVARIANT VIOLATION] Current state " << current 
-                             << " not in Q. Valid states: ";
-                    for (const auto& s : states) {
-                        std::cerr << s.id << " ";
-                    }
-                    std::cerr << std::endl;
-                    return false;
-                }
-            }
-            
-            if (verbose && prev_state != -1) {
-                std::cout << "  State: q" << prev_state << " → q" << current << " (symbol: '" << c << "')" << std::endl;
-                std::cout.flush(); // Flush immediately so frontend receives it in real-time
-            }
-            if (current == -1) {
                 std::cerr << "[INVARIANT FAIL][DFA] Undefined transition from q" << prev_state
-                          << " on '" << c << "'" << std::endl;
+                        << " on '" << symbol << "'" << std::endl;
                 return false;
             }
+            
+            // SOUNDNESS CHECK: Verify next state is in Q (set of states)
+            bool state_exists = false;
+            for (const auto& s : states) {
+                if (s.id == next) {
+                    state_exists = true;
+                    break;
+                }
+            }
+            if (!state_exists) {
+                std::cerr << "[INVARIANT VIOLATION] Next state " << next 
+                        << " not in Q. Valid states: ";
+                for (const auto& s : states) {
+                    std::cerr << s.id << " ";
+                }
+                std::cerr << std::endl;
+                return false;
+            }
+            
+            if (verbose) {
+                std::cout << "  State: q" << prev_state << " → q" << next 
+                        << " (symbol: '" << symbol << "')" << std::endl;
+                std::cout.flush();
+                // Small delay to allow frontend to process each state
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+            
+            current = next;
         }
-        if (verbose && current != -1) {
-            std::cout << "  Final state: q" << current << std::endl;
-            std::cout.flush(); // Flush immediately so frontend receives it in real-time
+        
+        bool accepted = accepting_states.count(current) > 0;
+        
+        if (verbose) {
+            std::cout << "  Final state: q" << current 
+                    << " - " << (accepted ? "ACCEPTED" : "REJECTED") << std::endl;
+            std::cout.flush();
         }
-        return accepting_states.count(current) > 0;
+        
+        return accepted;
     }
 };
 
