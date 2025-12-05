@@ -1,7 +1,0 @@
-[PATTERN -> DFA MAPPING]
-Pattern: update
-Description: mimic_legitimate
-DFA ID: 4
-Instance: 1
-
-SAFE MOCK FILE — contains no real executable code.

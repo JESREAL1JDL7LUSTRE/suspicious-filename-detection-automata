@@ -15,28 +15,28 @@ Uses Deterministic Finite Automaton (DFA)
 • Function: pattern matching
 
 1. Dataset Loading
-[INFO] Reading unified dataset: archive/unified_dataset.jsonl
-[INFO] Loading filename dataset: archive/unified_dataset.jsonl
-[SUCCESS] Loaded 12199 filename entries
-  Malicious: 10228, Benign: 1971
-  Unique extensions: 106
-[INFO] Loading filename dataset: archive/unified_dataset.jsonl
-[SUCCESS] Loaded 12199 filename entries
-  Malicious: 10228, Benign: 1971
-  Unique extensions: 106
+[INFO] Reading tricks dataset: archive/Malicious_file_trick_detection.jsonl
+[INFO] Loading filename dataset: archive/Malicious_file_trick_detection.jsonl
+[SUCCESS] Loaded 341 filename entries
+  Malicious: 341, Benign: 0
+  Unique extensions: 109
+[INFO] Loading filename dataset: archive/Malicious_file_trick_detection.jsonl
+[SUCCESS] Loaded 341 filename entries
+  Malicious: 341, Benign: 0
+  Unique extensions: 109
   Top extensions:
-    .bin: 11924
-    .exe: 98
-    .scr: 15
-    .bat: 12
+    .exe: 123
+    .scr: 22
+    .bat: 20
+    .{hidden}: 11
     .vbs: 8
     .lnk: 6
-    .{hidden}: 5
+    .𝙴𝚇𝙴: 5
+    .pif: 5
     .enc: 5
-    .dll: 4
-    .b64: 4
-✓ SUCCESS — Single-source unified dataset loaded
-✓ SUCCESS — Total filenames staged: 12199
+    .js: 4
+✓ SUCCESS — Trick dataset loaded
+✓ SUCCESS — Total filenames staged: 341
 
 2. Regex Pattern Definition
 [INFO] Defining regex patterns...
@@ -45,72 +45,120 @@ Uses Deterministic Finite Automaton (DFA)
   Method: Per-character tokenization
   Alphabet: Printable ASCII (32-126)
   Processing: Sequential character-by-character DFA transitions
-  Pattern 1: combined_patterns ('(exe|scr|bat|vbs|update|password|stealer|setup|patch)')
-[SUCCESS] Defined 1 patterns
+  Pattern 1: executable ('exe')
+  Pattern 2: screensaver ('scr')
+  Pattern 3: batch_file ('bat')
+  Pattern 4: vbscript ('vbs')
+  Pattern 5: mimic_legitimate ('update')
+  Pattern 6: deceptive_password ('password')
+  Pattern 7: deceptive_stealer ('stealer')
+  Pattern 8: deceptive_setup ('setup')
+  Pattern 9: deceptive_patch ('patch')
+[SUCCESS] Defined 9 patterns
 
 3. Regex → NFA (Thompson’s Construction)
 [INFO] Converting regex to NFAs (Thompson's Construction)...
-  Built NFA for '(exe|scr|bat|vbs|update|password|stealer|setup|patch)' - 55 states (time: 83 μs)
-[SUCCESS] Built 1 NFAs
-  Total NFA states: 55
-  Total time: 922 μs
+  Built NFA for 'exe' - 5 states (time: 36 μs)
+  Built NFA for 'scr' - 5 states (time: 27 μs)
+  Built NFA for 'bat' - 5 states (time: 18 μs)
+  Built NFA for 'vbs' - 5 states (time: 20 μs)
+  Built NFA for 'update' - 8 states (time: 40 μs)
+  Built NFA for 'password' - 10 states (time: 28 μs)
+  Built NFA for 'stealer' - 9 states (time: 35 μs)
+  Built NFA for 'setup' - 7 states (time: 27 μs)
+  Built NFA for 'patch' - 7 states (time: 52 μs)
+[SUCCESS] Built 9 NFAs
+  Total NFA states: 61
+  Total time: 6108 μs
   Complexity: O(|regex|) per pattern (Thompson's Construction)
 
-✓ SUCCESS — Total NFA states: 55
+✓ SUCCESS — Total NFA states: 61
 
 4. NFA → DFA (Subset Construction)
 [INFO] Converting NFAs to DFAs (Subset Construction)...
-  Converted NFA 1 -> DFA with 107 states (time: 30756 μs)
-[SUCCESS] Built 1 DFAs
-  Total states before minimization: 107
-  Total time: 33929 μs
+  Converted NFA 1 -> DFA with 7 states (time: 1267 μs)
+  Converted NFA 2 -> DFA with 7 states (time: 1193 μs)
+  Converted NFA 3 -> DFA with 7 states (time: 1698 μs)
+  Converted NFA 4 -> DFA with 7 states (time: 1526 μs)
+  Converted NFA 5 -> DFA with 13 states (time: 2199 μs)
+  Converted NFA 6 -> DFA with 17 states (time: 3554 μs)
+  Converted NFA 7 -> DFA with 15 states (time: 3280 μs)
+  Converted NFA 8 -> DFA with 11 states (time: 2664 μs)
+  Converted NFA 9 -> DFA with 11 states (time: 2841 μs)
+[SUCCESS] Built 9 DFAs
+  Total states before minimization: 95
+  Total time: 28986 μs
   Complexity: O(2^n) worst-case, where n = NFA states
-  Empirical: 55 NFA states → 107 DFA states
+  Empirical: 61 NFA states → 95 DFA states
 
-✓ SUCCESS — Total DFA states: 107
+✓ SUCCESS — Total DFA states: 95
 
 5. DFA Minimization (Hopcroft)
 [INFO] Minimizing DFAs (Hopcroft's Algorithm)...
-  DFA 1: refinement steps = 52, final equivalence classes = 54
+  DFA 1: refinement steps = 2, final equivalence classes = 4
+  DFA 2: refinement steps = 2, final equivalence classes = 4
+  DFA 3: refinement steps = 2, final equivalence classes = 4
+  DFA 4: refinement steps = 2, final equivalence classes = 4
+  DFA 5: refinement steps = 5, final equivalence classes = 7
+  DFA 6: refinement steps = 7, final equivalence classes = 9
+  DFA 7: refinement steps = 6, final equivalence classes = 8
+  DFA 8: refinement steps = 4, final equivalence classes = 6
+  DFA 9: refinement steps = 4, final equivalence classes = 6
 [SUCCESS] Minimized DFAs (Hopcroft)
-  States after minimization: 54
-  Reduction: 49.5327%
-  Total time: 299666 μs
+  States after minimization: 52
+  Reduction: 45.2632%
+  Total time: 41886 μs
   Complexity: O(k n log n) where k = |alphabet|, n = |DFA states|
-  Empirical: 107 states → 54 states
+  Empirical: 95 states → 52 states
 
 [OK] Wrote Regular Grammar: output/grammar_0.txt
+[OK] Wrote Regular Grammar: output/grammar_1.txt
+[OK] Wrote Regular Grammar: output/grammar_2.txt
+[OK] Wrote Regular Grammar: output/grammar_3.txt
+[OK] Wrote Regular Grammar: output/grammar_4.txt
+[OK] Wrote Regular Grammar: output/grammar_5.txt
+[OK] Wrote Regular Grammar: output/grammar_6.txt
+[OK] Wrote Regular Grammar: output/grammar_7.txt
+[OK] Wrote Regular Grammar: output/grammar_8.txt
 [OK] Wrote Regular Grammar: output/grammar_0.txt
+[OK] Wrote Regular Grammar: output/grammar_1.txt
+[OK] Wrote Regular Grammar: output/grammar_2.txt
+[OK] Wrote Regular Grammar: output/grammar_3.txt
+[OK] Wrote Regular Grammar: output/grammar_4.txt
+[OK] Wrote Regular Grammar: output/grammar_5.txt
+[OK] Wrote Regular Grammar: output/grammar_6.txt
+[OK] Wrote Regular Grammar: output/grammar_7.txt
+[OK] Wrote Regular Grammar: output/grammar_8.txt
 6. Sample Filename Detection (Randomized)
-[INFO] Testing 12199 filenames using DFAs...
+[INFO] Testing 341 filenames using DFAs...
 [SUCCESS] Testing complete
-  True Positives: 200
-  Detection accuracy: 1.63948%
+  True Positives: 304
+  Detection accuracy: 89.1496%
 
 [Sample True Positives]:
-  report.pdf.exe (matched: double_extension)
-  invoice.doc.scr (matched: double_extension)
-  budget.xlsx.vbs (matched: double_extension)
-  resume.pdf.bat (matched: double_extension)
+  report.pdf.exe (matched: executable)
+  invoice.doc.scr (matched: screensaver)
+  budget.xlsx.vbs (matched: vbscript)
+  resume.pdf.bat (matched: batch_file)
   contract.doc.pif (matched: double_extension)
 
 [Sample False Negatives]:
-  doc.pdf\u202eexe
-  safe.doc\uff25\uff38\uff25
-  report .exe
-  update.iso
-  docx.pdf\u202exex
+  system.dll
+  win32.sys
+  payload.bin
+  archive.zip:encrypted
+  video.mp4:payload
 
 6b. DFA Classification → Collect suspicious filenames
-  [INFO] DFA flagged 200 entries as suspicious
+  [INFO] DFA flagged 304 entries as suspicious
 7. DFA Summary
-True Positives:   200
-False Negatives:   10028
-Accuracy:      17.7965%
+True Positives:   304
+False Negatives:   37
+Accuracy:      89.1496%
 
 Execution Time:
-  Total:        101 ms
-  Per file:     0.00827937 ms
+  Total:        1 ms
+  Per file:     0.00293255 ms
 
 
 ╔═══════════════════════════════════════════════════════════╗
@@ -118,11 +166,11 @@ Execution Time:
 ╚═══════════════════════════════════════════════════════════╝
 
 [SAMPLE FILENAME RESULTS (RANDOMIZED)]
-[File_001]  "1af65e47992b406fb9167221301abe0aa8d65528abbc10380f1059b0a1487111.bin" → BENIGN
-[File_002]  "9c7173528ef4062fc8817daaed2fb2900618f350ea60bc104c05c27ec2900a12.bin" → BENIGN
-[File_003]  "dd42efe328eda213cb8247e07271b7767065cfc85ada79deb33bf6701c060494.bin" → BENIGN
-[File_004]  "35292f7ecacb0db9a2ef4188c704dfa309a5b6e695a492fa2134a7c3ca49cc5d.bin" → BENIGN
-[File_005]  "0539ea2e6a3fd9c60035b14ed29a1e627abd9129ed4052fec8efc7c17c15eb8f.bin" → BENIGN
+[File_001]  "script.js.enc" → MALICIOUS (matched: screensaver)
+[File_002]  "file.pdf:ml.exe" → MALICIOUS (matched: executable)
+[File_003]  "readme.txt:evil" → BENIGN
+[File_004]  "script.sh.exe" → MALICIOUS (matched: executable)
+[File_005]  "photo.png:exploit" → BENIGN
 
 [CONFUSION MATRIX DEFINITIONS]
   TP (True Positive):  Malicious file correctly detected as malicious
@@ -131,37 +179,51 @@ Execution Time:
   FN (False Negative): Malicious file incorrectly detected as benign
 
 [DETECTION METRICS]
-  ✓ True Positives (TP):   200
+  ✓ True Positives (TP):   304
   ✗ False Positives (FP):  0
-  ✓ True Negatives (TN):   1971
-  ✗ False Negatives (FN):  10028
+  ✓ True Negatives (TN):   0
+  ✗ False Negatives (FN):  37
   Precision:               100%
-  Recall:                  1.95542%
-  F1 Score:                3.83583%
-  Detection Rate:          17.7965%
+  Recall:                  89.1496%
+  F1 Score:                94.2636%
+  Detection Rate:          89.1496%
 
 [TOKENIZATION]
   Mode: per-character DFA
   Alphabet (Σ): {  , !, ", #, $, %, &, ', (, ), *, +, ,, -, ., /, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, :, ;, <, =, >, ?, @, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, [, \, ], ^, _, `, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, {, |, }, ~ }
 
 [STATE REDUCTION]
-  Original DFA states:    107
-  After Minimization:     54 (-49.5327% vs original)
+  Original DFA states:    95
+  After Minimization:     52 (-45.2632% vs original)
 
 [RESOURCE METRICS]
-  Estimated DFA memory:   81 KB (83376 bytes)
+  Estimated DFA memory:   78 KB (80288 bytes)
 
 [PERFORMANCE]
-  Patterns:               1
-  Files tested:           12199
-  Total execution time:   101 ms (wall-clock)
-  Average per file:       0.00827937 ms
+  Patterns:               9
+  Files tested:           341
+  Total execution time:   1 ms (wall-clock)
+  Average per file:       0.00293255 ms
   Note: Times measured using std::chrono::high_resolution_clock
 
 [PATTERN → DFA MAPPING]
-  Pattern '(exe|scr|bat|vbs|update|password|stealer|setup|patch)' (combined_patterns) → DFA 0
+  Pattern 'exe' (executable) → DFA 0
+  Pattern 'scr' (screensaver) → DFA 1
+  Pattern 'bat' (batch_file) → DFA 2
+  Pattern 'vbs' (vbscript) → DFA 3
+  Pattern 'update' (mimic_legitimate) → DFA 4
+  Pattern 'password' (deceptive_password) → DFA 5
+  Pattern 'stealer' (deceptive_stealer) → DFA 6
+  Pattern 'setup' (deceptive_setup) → DFA 7
+  Pattern 'patch' (deceptive_patch) → DFA 8
 
 [PER-PATTERN METRICS]
+  executable: TP=157, FP=0, FN=0, TN=0, precision=100%, recall=100%, F1=100%
+  screensaver: TP=28, FP=0, FN=0, TN=0, precision=100%, recall=100%, F1=100%
+  batch_file: TP=18, FP=0, FN=0, TN=0, precision=100%, recall=100%, F1=100%
+  vbscript: TP=8, FP=0, FN=0, TN=0, precision=100%, recall=100%, F1=100%
+  mimic_legitimate: TP=5, FP=0, FN=0, TN=0, precision=100%, recall=100%, F1=100%
+  deceptive_setup: TP=3, FP=0, FN=0, TN=0, precision=100%, recall=100%, F1=100%
 
 
 ╔═══════════════════════════════════╗
@@ -174,14 +236,14 @@ Uses Pushdown Automaton (PDA)
 • Function: sequence validation
 
 1. Loading TCP Trace Dataset
-[INFO] Reading: archive/unified_dataset.jsonl
-[INFO] Loading TCP trace dataset: archive/unified_dataset.jsonl
-[SUCCESS] Loaded 12199 TCP traces
-  Valid sequences: 1971
-  Invalid sequences: 10228
-✓ SUCCESS — Loaded 200 traces
+[INFO] Reading: archive/tcp_tricks.jsonl
+[INFO] Loading TCP trace dataset: archive/tcp_tricks.jsonl
+[SUCCESS] Loaded 338 TCP traces
+  Valid sequences: 0
+  Invalid sequences: 338
+✓ SUCCESS — Loaded 265 traces
 Valid:   0
-Invalid: 200
+Invalid: 265
 
 2. CFG for TCP 3-Way Handshake
 [INFO] Defining Context-Free Grammar for TCP Handshake...
@@ -236,7 +298,7 @@ P = {
 
 [OK] Wrote PDA construction log: output/pda_construction.txt
 4. PDA Validation — Sample Randomized Results
-[INFO] Validating 200 TCP traces with PDA...
+[INFO] Validating 265 TCP traces with PDA...
 [SUCCESS] Validation complete
   Accuracy: 100%
 
@@ -296,21 +358,21 @@ Step-by-step execution:
 ╚═══════════════════════════════════════════════════════════╝
 
 [SAMPLE TCP TRACE RESULTS (RANDOMIZED)]
-[Trace_001] file.exe\u202exet.pdf: INVALID (Synthetic invalid handshake for malicious filename)
-[Trace_002] config.yaml:stego.exe: INVALID (Synthetic invalid handshake for malicious filename)
-[Trace_003] file.docx:quantum.b64: INVALID (Synthetic invalid handshake for malicious filename)
-[Trace_004] file.doc:malware.js: INVALID (Synthetic invalid handshake for malicious filename)
-[Trace_005] file.pdf.hex: INVALID (Synthetic invalid handshake for malicious filename)
+[Trace_001] document.docx.{hidden}: INVALID (Synthetic invalid handshake for malicious filename)
+[Trace_002] install.msi.scr: INVALID (Synthetic invalid handshake for malicious filename)
+[Trace_003] setup.msi.exe: INVALID (Synthetic invalid handshake for malicious filename)
+[Trace_004] invoice.pdf.exe: INVALID (Synthetic invalid handshake for malicious filename)
+[Trace_005] file.exe:stego.dll: INVALID (Synthetic invalid handshake for malicious filename)
 
 [VALIDATION METRICS]
   ✓ Valid accepted:       0 / 0
-  ✓ Invalid rejected:     200 / 200
+  ✓ Invalid rejected:     265 / 265
   ✗ False positives:      0
   ✗ False negatives:      0
   Validation accuracy:    100%
 
 [STACK METRICS]
-  Average stack depth:    0.6
+  Average stack depth:    0.633962
   Maximum stack depth:    2
 
 [CONFUSION MATRIX DEFINITIONS]
@@ -322,22 +384,131 @@ Step-by-step execution:
 [CONFUSION MATRIX]
   ✓ True Positives (TP):   0
   ✗ False Positives (FP):  0
-  ✓ True Negatives (TN):   200
+  ✓ True Negatives (TN):   265
   ✗ False Negatives (FN):  0
   Precision:               0%
   Recall:                  0%
   F1 Score:                0%
 
 [PERFORMANCE]
-  Total traces:           200
-  Total execution time:   0.128 ms (wall-clock)
-  Average per trace:      0.00064 ms
+  Total traces:           265
+  Total execution time:   1.643 ms (wall-clock)
+  Average per trace:      0.0062 ms
   Note: Times measured using std::chrono::high_resolution_clock
 
-[OK] Wrote minimized DFA DOT: output/dfa_min_0.dot (pattern: combined_patterns)
+
+
+╔═══════════════════════════════════════════════════════════╗
+║        RE-RUN — CSV (combined_random + malware)           ║
+╚═══════════════════════════════════════════════════════════╝
+[INFO] Integrating combined CSV: archive/combined_random.csv
+[SUCCESS] Added 11923 entries from combined_random.csv
+[INFO] Integrating malware CSV: archive/malware.csv
+[SUCCESS] Added 10841 entries from malware.csv
+[INFO] Post-ingest label summary
+  Malicious: 20793, Benign: 1971
+  Label balance (majority share): 91.3416%
+
+[INFO] Classifying CSV dataset with existing DFA...
+  [INFO] DFA flagged 20793 CSV entries as suspicious
+
+╔═══════════════════════════════════════════════════════════╗
+║          DFA MODULE - DETECTION RESULTS                   ║
+╚═══════════════════════════════════════════════════════════╝
+
+[SAMPLE FILENAME RESULTS (RANDOMIZED)]
+[File_001]  "e42c9b044f2c6cda.exe" → MALICIOUS (matched: executable)
+[File_002]  "8bd49ff13b39e9b8.txt" → BENIGN
+[File_003]  "e9dcdd05f3bee021.txt" → BENIGN
+[File_004]  "aeaaf67e38fb1d44.txt" → BENIGN
+[File_005]  "0c4db97ea4705e3b.exe" → MALICIOUS (matched: executable)
+
+[CONFUSION MATRIX DEFINITIONS]
+  TP (True Positive):  Malicious file correctly detected as malicious
+  FP (False Positive): Benign file incorrectly detected as malicious
+  TN (True Negative):  Benign file correctly detected as benign
+  FN (False Negative): Malicious file incorrectly detected as benign
+
+[DETECTION METRICS]
+  ✓ True Positives (TP):   20793
+  ✗ False Positives (FP):  0
+  ✓ True Negatives (TN):   1971
+  ✗ False Negatives (FN):  0
+  Precision:               100%
+  Recall:                  100%
+  F1 Score:                100%
+  Detection Rate:          100%
+
+[TOKENIZATION]
+  Mode: per-character DFA
+  Alphabet (Σ): {  , !, ", #, $, %, &, ', (, ), *, +, ,, -, ., /, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, :, ;, <, =, >, ?, @, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, [, \, ], ^, _, `, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, {, |, }, ~ }
+
+[STATE REDUCTION]
+  Original DFA states:    0
+  After Minimization:     0 (-0% vs original)
+
+[RESOURCE METRICS]
+  Estimated DFA memory:   78 KB (80288 bytes)
+
+[PERFORMANCE]
+  Patterns:               0
+  Files tested:           22764
+  Total execution time:   165 ms (wall-clock)
+  Average per file:       0.00724829 ms
+  Note: Times measured using std::chrono::high_resolution_clock
+
+[PATTERN → DFA MAPPING]
+  Pattern 'exe' (executable) → DFA 0
+  Pattern 'scr' (screensaver) → DFA 1
+  Pattern 'bat' (batch_file) → DFA 2
+  Pattern 'vbs' (vbscript) → DFA 3
+  Pattern 'update' (mimic_legitimate) → DFA 4
+  Pattern 'password' (deceptive_password) → DFA 5
+  Pattern 'stealer' (deceptive_stealer) → DFA 6
+  Pattern 'setup' (deceptive_setup) → DFA 7
+  Pattern 'patch' (deceptive_patch) → DFA 8
+
+[PER-PATTERN METRICS]
+  executable: TP=157, FP=0, FN=0, TN=0, precision=100%, recall=100%, F1=100%
+  screensaver: TP=28, FP=0, FN=0, TN=0, precision=100%, recall=100%, F1=100%
+  batch_file: TP=18, FP=0, FN=0, TN=0, precision=100%, recall=100%, F1=100%
+  vbscript: TP=8, FP=0, FN=0, TN=0, precision=100%, recall=100%, F1=100%
+  mimic_legitimate: TP=5, FP=0, FN=0, TN=0, precision=100%, recall=100%, F1=100%
+  deceptive_setup: TP=3, FP=0, FN=0, TN=0, precision=100%, recall=100%, F1=100%
+
+
+[INFO] Loading CSV TCP traces: archive/combined_with_tcp.csv
+[INFO] Loading TCP trace dataset (CSV): archive/combined_with_tcp.csv
+[SUCCESS] Loaded 13794 TCP traces (CSV)
+  Valid sequences: 1971
+  Invalid sequences: 11823
+✓ SUCCESS — Loaded 11823 traces
+Valid:   0
+Invalid: 11823
+[INFO] Validating 11823 TCP traces with PDA...
+[SUCCESS] Validation complete
+  Accuracy: 100%
+
+[OK] Wrote minimized DFA DOT: output/dfa_min_0.dot (pattern: executable)
+[OK] Wrote minimized DFA DOT: output/dfa_min_1.dot (pattern: screensaver)
+[OK] Wrote minimized DFA DOT: output/dfa_min_2.dot (pattern: batch_file)
+[OK] Wrote minimized DFA DOT: output/dfa_min_3.dot (pattern: vbscript)
+[OK] Wrote minimized DFA DOT: output/dfa_min_4.dot (pattern: mimic_legitimate)
+[OK] Wrote minimized DFA DOT: output/dfa_min_5.dot (pattern: deceptive_password)
+[OK] Wrote minimized DFA DOT: output/dfa_min_6.dot (pattern: deceptive_stealer)
+[OK] Wrote minimized DFA DOT: output/dfa_min_7.dot (pattern: deceptive_setup)
+[OK] Wrote minimized DFA DOT: output/dfa_min_8.dot (pattern: deceptive_patch)
 [OK] Wrote PDA DOT: output/pda.dot
 [OK] Wrote combined DOT: output/graph_from_run.dot
 [OK] Wrote output/dfa_min_0.json
+[OK] Wrote output/dfa_min_1.json
+[OK] Wrote output/dfa_min_2.json
+[OK] Wrote output/dfa_min_3.json
+[OK] Wrote output/dfa_min_4.json
+[OK] Wrote output/dfa_min_5.json
+[OK] Wrote output/dfa_min_6.json
+[OK] Wrote output/dfa_min_7.json
+[OK] Wrote output/dfa_min_8.json
 [OK] Wrote output/pda.json
 [OK] Wrote output/automata.json
 

@@ -21,6 +21,11 @@ namespace CS311 {
 
 DFAModule::DFAModule() {}
 
+void DFAModule::clearDataset() {
+    dataset.clear();
+    metrics = DFAMetrics{};
+}
+
 void DFAModule::loadDataset(const std::string& filepath) {
     dataset = JSONParser::loadFilenameDataset(filepath);
     metrics.filenames_tested = (int)dataset.size();

@@ -46,6 +46,8 @@ private:
 public:
     DFAModule();
     void setCombineAllPatterns(bool on) { combineAll = on; }
+    // Clear current staged filename dataset and reset basic metrics
+    void clearDataset();
     
     // Module pipeline
     void loadDataset(const std::string& filepath);

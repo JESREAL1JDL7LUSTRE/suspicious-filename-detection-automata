@@ -28,7 +28,8 @@ import random
 from typing import Dict, List, Tuple
 
 ARCHIVE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'archive')
-OUT_PATH = os.path.join(ARCHIVE_DIR, 'unified_dataset.jsonl')
+OUT_TRICKS = os.path.join(ARCHIVE_DIR, 'tcp_tricks.jsonl')
+OUT_CSV = os.path.join(ARCHIVE_DIR, 'combined_with_tcp.csv')
 
 random.seed(311)
 
@@ -132,29 +133,13 @@ def main():
     comb_path = os.path.join(ARCHIVE_DIR, 'combined_random.csv')
     malw_path = os.path.join(ARCHIVE_DIR, 'malware.csv')
 
-    pairs: List[Tuple[str, bool]] = []
-    pairs.extend(read_jsonl_filenames(jsonl_path))
-    pairs.extend(read_csv_filenames(comb_path, default_malicious=False))
-    pairs.extend(read_csv_filenames(malw_path, default_malicious=True))
-
-    # Deduplicate preserving first occurrence
-    seen = set()
-    dedup: List[Tuple[str, bool]] = []
-    for fn, mal in pairs:
-        if fn in seen:
-            continue
-        seen.add(fn)
-        dedup.append((fn, mal))
-
-    count = 0
-    with open(OUT_PATH, 'w', encoding='utf-8') as out:
-        for filename, is_mal in dedup:
-            seq, valid, desc, cat = choose_sequence(is_mal)
+    # 1) Build TCP traces for the tricks JSONL dataset (write JSONL)
+    tricks = read_jsonl_filenames(jsonl_path)
+    written_tricks = 0
+    with open(OUT_TRICKS, 'w', encoding='utf-8') as out:
+        for filename, is_mal in tricks:
+            seq, valid, desc, cat = choose_sequence(is_mal or True)
             rec = {
-                # DFA fields
-                "filename": filename,
-                "is_malicious": bool(is_mal),
-                # PDA fields (trace_id mirrors filename)
                 "trace_id": filename,
                 "sequence": seq,
                 "valid": valid,
@@ -162,9 +147,64 @@ def main():
                 "category": cat,
             }
             out.write(json.dumps(rec) + "\n")
-            count += 1
+            written_tricks += 1
 
-    print(f"Wrote {count} unified records to {OUT_PATH}")
+    # 2) Build TCP traces for the combined CSV dataset using the SAME filename
+    #    synthesis as DFAModule.integrateCombinedAndMalwareCSVs to ensure match.
+    def synth_filename_from_hash(hash_value: str, malicious: bool) -> str:
+        base = (hash_value or '')[:16]
+        return f"{base}{'.exe' if malicious else '.txt'}"
+
+    def iter_combined_rows(path: str):
+        if not os.path.exists(path):
+            return []
+        rows = []
+        with open(path, 'r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            header = next(reader, None)
+            for row in reader:
+                if not row:
+                    continue
+                # Expect format: type,hash
+                if len(row) < 2:
+                    continue
+                rows.append((row[0], row[1]))
+        return rows
+
+    csv_pairs: List[Tuple[str, bool]] = []
+    # combined_random.csv: type=1 benign, type=0 malicious
+    for tval, hv in iter_combined_rows(comb_path):
+        malicious = (tval.strip() == '0')
+        filename = synth_filename_from_hash(hv.strip(), malicious)
+        csv_pairs.append((filename, malicious))
+    # malware.csv: all malicious
+    for _tval, hv in iter_combined_rows(malw_path):
+        filename = synth_filename_from_hash(hv.strip(), True)
+        csv_pairs.append((filename, True))
+
+    # Deduplicate preserving first occurrence
+    seen_csv = set()
+    dedup_csv: List[Tuple[str, bool]] = []
+    for fn, mal in csv_pairs:
+        if fn in seen_csv:
+            continue
+        seen_csv.add(fn)
+        dedup_csv.append((fn, mal))
+
+    written_csv = 0
+    # Write a CSV with columns: trace_id,sequence,valid,description,category
+    # sequence is pipe-delimited tokens to avoid commas
+    with open(OUT_CSV, 'w', encoding='utf-8', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(["trace_id","sequence","valid","description","category"])
+        for filename, is_mal in dedup_csv:
+            seq, valid, desc, cat = choose_sequence(is_mal)
+            seq_str = "|".join(seq)
+            writer.writerow([filename, seq_str, "true" if valid else "false", desc, cat])
+            written_csv += 1
+
+    print(f"Wrote {written_tricks} TCP trick traces to {OUT_TRICKS}")
+    print(f"Wrote {written_csv} TCP CSV traces to {OUT_CSV}")
 
 
 if __name__ == '__main__':
