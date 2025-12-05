@@ -102,7 +102,11 @@ struct DFA {
                 std::cout << "  State: q" << prev_state << " → q" << current << " (symbol: '" << c << "')" << std::endl;
                 std::cout.flush(); // Flush immediately so frontend receives it in real-time
             }
-            if (current == -1) return false;
+            if (current == -1) {
+                std::cerr << "[INVARIANT FAIL][DFA] Undefined transition from q" << prev_state
+                          << " on '" << c << "'" << std::endl;
+                return false;
+            }
         }
         if (verbose && current != -1) {
             std::cout << "  Final state: q" << current << std::endl;

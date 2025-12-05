@@ -34,10 +34,8 @@ private:
     std::set<int> epsilonClosure(const NFA& nfa, const std::set<int>& states);
     std::set<int> move(const NFA& nfa, const std::set<int>& states, char symbol);
     
-    // NEW: Actually use DFAs for testing
-    bool testFilenameWithDFA(const std::string& filename, std::string& matched_pattern);
+    // NEW: Actually use DFAs for testing (non-verbose helpers kept private; public wrappers below)
     bool testFilenameWithDFAVerbose(const std::string& filename, std::string& matched_pattern);
-    bool runDFA(const DFA& dfa, const std::string& input);
     bool runDFAVerbose(const DFA& dfa, const std::string& input);
     bool checkAdditionalPatterns(const std::string& filename, std::string& matched_pattern);
     // Tokenization discipline: current DFA is per-character; helper to expose alphabet
@@ -65,6 +63,15 @@ public:
     void generateScanReport(const std::vector<std::string>& filePaths, 
                            const std::vector<bool>& detected, 
                            const std::vector<std::string>& matched_patterns);
+    // Public non-verbose DFA run/classification
+    bool runDFA(const DFA& dfa, const std::string& input);
+    bool testFilenameWithDFA(const std::string& filename, std::string& matched_pattern);
+    // Integrate evaluation CSVs: combined_random (type column) and malware
+    // Synthesizes filenames from hashes and routes by label:
+    // - combined_random.csv: type=1 -> benign, type=0 -> malicious
+    // - malware.csv: all rows treated as malicious
+    void integrateCombinedAndMalwareCSVs(const std::string& combinedCsvPath,
+                                         const std::string& malwareCsvPath);
     // Export Graphviz DOT for the built DFAs (after convertToDFAs / applyIGA)
     std::string exportGraphvizAll() const;
     // Export single DFA cluster by index (useful to write separate files)
