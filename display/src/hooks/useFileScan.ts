@@ -128,7 +128,7 @@ export function useFileScan(onComplete?: (results: ScanResult[]) => void) {
                     // Debug: log if message contains state transitions
                     if (message.includes('State:') || message.includes('Final state')) {
                       console.log('📦 Message contains state transitions, splitting into', lines.length, 'lines')
-                      console.log('📦 Sample lines:', lines.slice(0, 5).map(l => l.substring(0, 80)))
+                      console.log('📦 Sample lines:', lines.slice(0, 5).map((l: string) => l.substring(0, 80)))
                       console.log('📦 Full message:', message)
                     }
                     

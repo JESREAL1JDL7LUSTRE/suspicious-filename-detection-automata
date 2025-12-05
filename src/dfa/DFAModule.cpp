@@ -13,6 +13,8 @@
 #include <queue>
 #include <map>
 #include <sstream>
+#include <random>
+#include <iomanip>
 // (no extra headers needed for original implementation)
 
 namespace CS311 {
@@ -22,10 +24,48 @@ DFAModule::DFAModule() {}
 void DFAModule::loadDataset(const std::string& filepath) {
     dataset = JSONParser::loadFilenameDataset(filepath);
     metrics.filenames_tested = (int)dataset.size();
+    // Dataset sanity checks: benign/malicious counts and extension frequency
+    int malicious = 0, benign = 0;
+    std::map<std::string,int> extFreq;
+    for (const auto& e : dataset) {
+        if (e.is_malicious) malicious++; else benign++;
+        auto pos = e.filename.find_last_of('.');
+        if (pos != std::string::npos && pos+1 < e.filename.size()) {
+            std::string ext = e.filename.substr(pos+1);
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+            extFreq[ext]++;
+        }
+    }
+    std::cout << "[INFO] Loading filename dataset: " << filepath << std::endl;
+    std::cout << "[SUCCESS] Loaded " << dataset.size() << " filename entries" << std::endl;
+    std::cout << "  Malicious: " << malicious << ", Benign: " << benign << std::endl;
+    std::cout << "  Unique extensions: " << extFreq.size() << std::endl;
+    // Note: Additional CSV integration may rebalance labels; final counts shown after CSV ingest
+    // Top-N extensions
+    std::vector<std::pair<std::string,int>> exts(extFreq.begin(), extFreq.end());
+    std::sort(exts.begin(), exts.end(), [](auto&a, auto&b){return a.second>b.second;});
+    int N = std::min(10, (int)exts.size());
+    if (N>0) {
+        std::cout << "  Top extensions:" << std::endl;
+        for (int i=0;i<N;i++) {
+            std::cout << "    ." << exts[i].first << ": " << exts[i].second << std::endl;
+        }
+    }
 }
 
 void DFAModule::definePatterns() {
     std::cout << "[INFO] Defining regex patterns..." << std::endl;
+    
+    // TOKENIZATION DISCIPLINE
+    // Filenames are tokenized per-character (not per-lexeme).
+    // Each character in the filename is processed sequentially by the DFA.
+    // Alphabet: All printable ASCII characters (32-126), including:
+    //   - Letters (a-z, A-Z)
+    //   - Digits (0-9)
+    //   - Special characters: . - _ ( ) [ ] { } ! @ # $ % ^ & * + = | \ : ; " ' < > , ? / ~ `
+    //   - Whitespace (space, tab)
+    // The DFA processes the filename character-by-character, making transitions
+    // based on each symbol in the input string.
     
     // Patterns for malicious filename detection
     regex_patterns.push_back("exe");
@@ -42,8 +82,26 @@ void DFAModule::definePatterns() {
     
     regex_patterns.push_back("update");
     pattern_names.push_back("mimic_legitimate");
+
+    // Expanded deceptive keywords coverage (substring-based)
+    regex_patterns.push_back("password");
+    pattern_names.push_back("deceptive_password");
+
+    regex_patterns.push_back("stealer");
+    pattern_names.push_back("deceptive_stealer");
+
+    regex_patterns.push_back("setup");
+    pattern_names.push_back("deceptive_setup");
+
+    regex_patterns.push_back("patch");
+    pattern_names.push_back("deceptive_patch");
     
     metrics.total_patterns = (int)regex_patterns.size();
+    
+    std::cout << "\n[TOKENIZATION DISCIPLINE]" << std::endl;
+    std::cout << "  Method: Per-character tokenization" << std::endl;
+    std::cout << "  Alphabet: Printable ASCII (32-126)" << std::endl;
+    std::cout << "  Processing: Sequential character-by-character DFA transitions" << std::endl;
     
     for (size_t i = 0; i < pattern_names.size(); ++i) {
         std::cout << "  Pattern " << (i+1) << ": " << pattern_names[i] 
@@ -55,38 +113,66 @@ void DFAModule::definePatterns() {
 void DFAModule::buildNFAs() {
     std::cout << "[INFO] Converting regex to NFAs (Thompson's Construction)..." << std::endl;
     
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
     for (const auto& pattern : regex_patterns) {
         try {
+            auto pattern_start = std::chrono::high_resolution_clock::now();
             NFA nfa = RegexParser::regexToNFA(pattern);
+            auto pattern_end = std::chrono::high_resolution_clock::now();
+            auto pattern_dur = std::chrono::duration_cast<std::chrono::microseconds>(pattern_end - pattern_start);
+            
             nfas.push_back(nfa);
             metrics.total_nfa_states += nfa.getStateCount();
             std::cout << "  Built NFA for '" << pattern << "' - " 
-                     << nfa.getStateCount() << " states" << std::endl;
+                     << nfa.getStateCount() << " states"
+                     << " (time: " << pattern_dur.count() << " μs)" << std::endl;
         } catch (const std::exception& e) {
             std::cerr << "[WARNING] Failed to build NFA for pattern: " << pattern 
                      << " - " << e.what() << std::endl;
         }
     }
     
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto total_dur = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+    
     std::cout << "[SUCCESS] Built " << nfas.size() << " NFAs" << std::endl;
-    std::cout << "  Total NFA states: " << metrics.total_nfa_states << "\n" << std::endl;
+    std::cout << "  Total NFA states: " << metrics.total_nfa_states << std::endl;
+    std::cout << "  Total time: " << total_dur.count() << " μs" << std::endl;
+    std::cout << "  Complexity: O(|regex|) per pattern (Thompson's Construction)" << std::endl;
+    std::cout << std::endl;
 }
 
 void DFAModule::convertToDFAs() {
     std::cout << "[INFO] Converting NFAs to DFAs (Subset Construction)..." << std::endl;
     
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
     for (size_t i = 0; i < nfas.size(); i++) {
         const auto& nfa = nfas[i];
+        auto pattern_start = std::chrono::high_resolution_clock::now();
         DFA dfa = subsetConstruction(nfa);
+        auto pattern_end = std::chrono::high_resolution_clock::now();
+        auto pattern_dur = std::chrono::duration_cast<std::chrono::microseconds>(pattern_end - pattern_start);
+        
         dfas.push_back(dfa);
         metrics.total_dfa_states_before_min += dfa.getStateCount();
         std::cout << "  Converted NFA " << (i+1) << " -> DFA with " 
-                 << dfa.getStateCount() << " states" << std::endl;
+                 << dfa.getStateCount() << " states"
+                 << " (time: " << pattern_dur.count() << " μs)" << std::endl;
     }
+    
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto total_dur = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
     
     std::cout << "[SUCCESS] Built " << dfas.size() << " DFAs" << std::endl;
     std::cout << "  Total states before minimization: " 
-             << metrics.total_dfa_states_before_min << "\n" << std::endl;
+             << metrics.total_dfa_states_before_min << std::endl;
+    std::cout << "  Total time: " << total_dur.count() << " μs" << std::endl;
+    std::cout << "  Complexity: O(2^n) worst-case, where n = NFA states" << std::endl;
+    std::cout << "  Empirical: " << metrics.total_nfa_states << " NFA states → " 
+             << metrics.total_dfa_states_before_min << " DFA states" << std::endl;
+    std::cout << std::endl;
 }
 
 // ACTUAL SUBSET CONSTRUCTION ALGORITHM
@@ -205,6 +291,8 @@ std::set<int> DFAModule::move(const NFA& nfa, const std::set<int>& states, char 
 void DFAModule::minimizeDFAs() {
     std::cout << "[INFO] Minimizing DFAs (Hopcroft's Algorithm)..." << std::endl;
 
+    auto start_time = std::chrono::high_resolution_clock::now();
+
     minimized_dfas.clear();
     metrics.total_dfa_states_after_min = 0;
 
@@ -218,7 +306,10 @@ void DFAModule::minimizeDFAs() {
         std::cout << "  DFA " << (i+1) << ": refinement steps = " << refinementSteps
                   << ", final equivalence classes = " << finalPartitions.size() << std::endl;
     }
-
+    
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto total_dur = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+    
     if (metrics.total_dfa_states_before_min > 0) {
         metrics.state_reduction_min_percent =
             ((double)(metrics.total_dfa_states_before_min - metrics.total_dfa_states_after_min) /
@@ -227,7 +318,12 @@ void DFAModule::minimizeDFAs() {
 
     std::cout << "[SUCCESS] Minimized DFAs (Hopcroft)" << std::endl;
     std::cout << "  States after minimization: " << metrics.total_dfa_states_after_min << std::endl;
-    std::cout << "  Reduction: " << metrics.state_reduction_min_percent << "%\n" << std::endl;
+    std::cout << "  Reduction: " << metrics.state_reduction_min_percent << "%" << std::endl;
+    std::cout << "  Total time: " << total_dur.count() << " μs" << std::endl;
+    std::cout << "  Complexity: O(k n log n) where k = |alphabet|, n = |DFA states|" << std::endl;
+    std::cout << "  Empirical: " << metrics.total_dfa_states_before_min << " states → " 
+             << metrics.total_dfa_states_after_min << " states" << std::endl;
+    std::cout << std::endl;
 }
 
 void DFAModule::testPatterns() {
@@ -324,9 +420,47 @@ bool DFAModule::testFilenameWithDFA(const std::string& filename, std::string& ma
     return checkAdditionalPatterns(filename, matched_pattern);
 }
 
+// Test filename with DFA using verbose mode (for file scanning visualization)
+bool DFAModule::testFilenameWithDFAVerbose(const std::string& filename, std::string& matched_pattern) {
+    // Convert to lowercase for case-insensitive matching
+    std::string lower = filename;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    
+    // Test against all DFAs with verbose state transitions
+    for (size_t i = 0; i < minimized_dfas.size() && i < pattern_names.size(); i++) {
+        if (runDFAVerbose(minimized_dfas[i], lower)) {
+            matched_pattern = pattern_names[i];
+            return true;
+        }
+    }
+    
+    // Additional heuristics for patterns DFAs might miss
+    return checkAdditionalPatterns(filename, matched_pattern);
+}
+
 // Run a DFA on input string
 bool DFAModule::runDFA(const DFA& dfa, const std::string& input) {
-    return dfa.accepts(input, true); // Enable verbose mode to show state transitions
+    // Normalize to printable ASCII for DFA processing
+    std::string ascii;
+    ascii.reserve(input.size());
+    for (unsigned char c : input) {
+        if (c >= 32 && c <= 126) ascii.push_back((char)c);
+        else ascii.push_back('_');
+    }
+    return dfa.accepts(ascii, false);
+}
+
+// Run a DFA on input string with verbose state transitions (for file scanning visualization)
+bool DFAModule::runDFAVerbose(const DFA& dfa, const std::string& input) {
+    // Verbose mode ON for file scanning to enable progressive state coloring
+    // Normalize to printable ASCII
+    std::string ascii;
+    ascii.reserve(input.size());
+    for (unsigned char c : input) {
+        if (c >= 32 && c <= 126) ascii.push_back((char)c);
+        else ascii.push_back('_');
+    }
+    return dfa.accepts(ascii, true);
 }
 
 // Additional pattern checks (for comprehensive detection)
@@ -362,24 +496,111 @@ bool DFAModule::checkAdditionalPatterns(const std::string& filename,
     return false;
 }
 
+void DFAModule::integrateCombinedAndMalwareCSVs(const std::string& combinedCsvPath,
+                                                const std::string& malwareCsvPath) {
+    auto synthFromHash = [&](const std::string& hash, bool malicious){
+        FilenameEntry e;
+        std::string base = hash.substr(0, std::min<size_t>(16, hash.size()));
+        e.filename = base + (malicious ? ".exe" : ".txt");
+        e.technique = malicious ? "malicious_synthesized" : "benign_synthesized";
+        e.category = malicious ? "malicious" : "benign";
+        e.detected_by = "csv";
+        e.is_malicious = malicious;
+        dataset.push_back(e);
+    };
+
+    // Ingest combined_random.csv (type column: 1=benign, 0=malicious)
+    {
+        std::ifstream in(combinedCsvPath);
+        if (!in.is_open()) {
+            std::cerr << "[WARN] Could not open combined CSV: " << combinedCsvPath << std::endl;
+        } else {
+            std::cout << "[INFO] Integrating combined CSV: " << combinedCsvPath << std::endl;
+            std::string line; bool headerSkipped=false; int added=0;
+            while (std::getline(in, line)) {
+                if (!headerSkipped) { headerSkipped=true; continue; }
+                if (line.empty()) continue;
+                std::istringstream ss(line);
+                std::string typeStr, hash;
+                if (!std::getline(ss, typeStr, ',')) continue;
+                if (!std::getline(ss, hash, ',')) continue;
+                if (hash.empty()) continue;
+                bool malicious = (typeStr == "0");
+                synthFromHash(hash, malicious);
+                added++;
+            }
+            in.close();
+            std::cout << "[SUCCESS] Added " << added << " entries from combined_random.csv" << std::endl;
+        }
+    }
+
+    // Ingest malware.csv (all treated as malicious)
+    {
+        std::ifstream in(malwareCsvPath);
+        if (!in.is_open()) {
+            std::cerr << "[WARN] Could not open malware CSV: " << malwareCsvPath << std::endl;
+        } else {
+            std::cout << "[INFO] Integrating malware CSV: " << malwareCsvPath << std::endl;
+            std::string line; bool headerSkipped=false; int added=0;
+            while (std::getline(in, line)) {
+                if (!headerSkipped) { headerSkipped=true; continue; }
+                if (line.empty()) continue;
+                std::istringstream ss(line);
+                std::string typeStr, hash;
+                if (!std::getline(ss, typeStr, ',')) continue;
+                if (!std::getline(ss, hash, ',')) continue;
+                if (hash.empty()) continue;
+                synthFromHash(hash, true);
+                added++;
+            }
+            in.close();
+            std::cout << "[SUCCESS] Added " << added << " entries from malware.csv" << std::endl;
+        }
+    }
+
+    metrics.filenames_tested = (int)dataset.size();
+    // Post-ingest label summary accounting for combined_random (type=1) and malware.csv
+    int malicious = 0, benign = 0;
+    for (const auto& e : dataset) { if (e.is_malicious) malicious++; else benign++; }
+    std::cout << "[INFO] Post-ingest label summary" << std::endl;
+    std::cout << "  Malicious: " << malicious << ", Benign: " << benign << std::endl;
+    if (malicious + benign > 0) {
+        double maj = (double)std::max(malicious, benign);
+        double imbalance = 100.0 * maj / (double)(malicious + benign);
+        std::cout << "  Label balance (majority share): " << imbalance << "%" << std::endl;
+    }
+}
+
 void DFAModule::generateReport() {
     std::cout << "\n";
     std::cout << "╔═══════════════════════════════════════════════════════════╗" << std::endl;
     std::cout << "║          DFA MODULE - DETECTION RESULTS                   ║" << std::endl;
     std::cout << "╚═══════════════════════════════════════════════════════════╝" << std::endl;
     
-    // Show sample filename results (deterministic order)
+    // Show sample filename results (truly randomized from staged dataset)
     std::cout << "\n[SAMPLE FILENAME RESULTS (RANDOMIZED)]" << std::endl;
-    int sample_count = 0;
-    for (const auto& entry : dataset) {
-        if (sample_count >= 5) break;
-        std::string matched;
-        bool detected = testFilenameWithDFA(entry.filename, matched);
-        std::string result = detected ? "MALICIOUS" : "BENIGN";
-        std::string match_info = detected ? " (matched: " + matched + ")" : "";
-        std::cout << "[Sample " << (sample_count + 1) << "]  \"" << entry.filename 
-                  << "\" → " << result << match_info << std::endl;
-        sample_count++;
+    {
+        const size_t K = 5;
+        std::vector<size_t> idx(dataset.size());
+        for (size_t i=0;i<idx.size();++i) idx[i]=i;
+        if (!idx.empty()) {
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::shuffle(idx.begin(), idx.end(), gen);
+            size_t sample_count = 0;
+            for (size_t j=0; j<idx.size() && sample_count<K; ++j) {
+                const auto& entry = dataset[idx[j]];
+                std::string matched;
+                bool detected = testFilenameWithDFA(entry.filename, matched);
+                std::string result = detected ? "MALICIOUS" : "BENIGN";
+                std::string match_info = detected ? " (matched: " + matched + ")" : "";
+                std::ostringstream id;
+                id << "File_" << std::setw(3) << std::setfill('0') << (sample_count+1);
+                std::cout << "[" << id.str() << "]  \"" << entry.filename
+                          << "\" → " << result << match_info << std::endl;
+                sample_count++;
+            }
+        }
     }
     
     // Calculate confusion matrix metrics (micro-average)
@@ -562,9 +783,12 @@ std::string DFAModule::exportGraphvizFor(size_t index) const {
     if (index >= minimized_dfas.size()) return ss.str();
 
     const DFA& dfa = minimized_dfas[index];
+    std::string patternName = (index < pattern_names.size()) ? pattern_names[index] : (std::string("dfa_") + std::to_string(index));
+    std::string regexPattern = (index < regex_patterns.size()) ? regex_patterns[index] : "";
+    
     std::string cluster = "cluster_dfa_" + std::to_string(index);
     ss << "  subgraph " << cluster << " {\n";
-    ss << "    label=\"" << (index < pattern_names.size() ? pattern_names[index] : (std::string("dfa_") + std::to_string(index))) << "\";\n";
+    ss << "    label=\"" << patternName << " (regex: " << regexPattern << ")\";\n";
     ss << "    color=lightgrey;\n";
     ss << "    node [style=filled,color=white];\n";
 
@@ -653,7 +877,8 @@ void DFAModule::scanFiles(const std::vector<std::string>& filePaths) {
         std::string matched;
         std::cout << "  → Running DFA simulation..." << std::endl;
         std::cout.flush();
-        bool isDetected = testFilenameWithDFA(fileName, matched);
+        // Use verbose mode for file scanning to enable progressive state coloring
+        bool isDetected = testFilenameWithDFAVerbose(fileName, matched);
         
         detected.push_back(isDetected);
         matched_patterns.push_back(matched);
@@ -702,20 +927,33 @@ void DFAModule::generateScanReport(const std::vector<std::string>& filePaths,
         }
     }
     
-    // Show sample results
+    // Show sample results (randomized from scanned files)
     std::cout << "\n[SAMPLE FILENAME RESULTS (RANDOMIZED)]" << std::endl;
-    int sample_count = 0;
-    for (size_t i = 0; i < filePaths.size() && sample_count < 5; ++i) {
-        std::string fileName = filePaths[i];
-        size_t lastSlash = filePaths[i].find_last_of("/\\");
-        if (lastSlash != std::string::npos) {
-            fileName = filePaths[i].substr(lastSlash + 1);
+    {
+        const size_t K = 5;
+        std::vector<size_t> idx(filePaths.size());
+        for (size_t i=0;i<idx.size();++i) idx[i]=i;
+        if (!idx.empty()) {
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::shuffle(idx.begin(), idx.end(), gen);
+            size_t sample_count = 0;
+            for (size_t t=0; t<idx.size() && sample_count<K; ++t) {
+                size_t i = idx[t];
+                std::string fileName = filePaths[i];
+                size_t lastSlash = filePaths[i].find_last_of("/\\");
+                if (lastSlash != std::string::npos) {
+                    fileName = filePaths[i].substr(lastSlash + 1);
+                }
+                std::string result = detected[i] ? "MALICIOUS" : "BENIGN";
+                std::string match_info = detected[i] ? " (matched: " + matched_patterns[i] + ")" : "";
+                std::ostringstream id;
+                id << "File_" << std::setw(3) << std::setfill('0') << (sample_count+1);
+                std::cout << "[" << id.str() << "]  \"" << fileName
+                          << "\" → " << result << match_info << std::endl;
+                sample_count++;
+            }
         }
-        std::string result = detected[i] ? "MALICIOUS" : "BENIGN";
-        std::string match_info = detected[i] ? " (matched: " + matched_patterns[i] + ")" : "";
-        std::cout << "[Sample " << (sample_count + 1) << "]  \"" << fileName 
-                  << "\" → " << result << match_info << std::endl;
-        sample_count++;
     }
     
     std::cout << "\n╔═══════════════════════════════════════════════════════════╗" << std::endl;

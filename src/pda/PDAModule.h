@@ -27,6 +27,7 @@ private:
     std::vector<TCPTrace> dataset;
     PDA pda;
     PDAMetrics metrics;
+    bool strictHandshakeOnly = false;
     
     // Process a single packet
     bool processPacket(const std::string& packet, std::vector<std::string>& operations);
@@ -36,6 +37,7 @@ private:
 
 public:
     PDAModule();
+    void setStrictHandshake(bool strict) { strictHandshakeOnly = strict; }
     
     // Module pipeline
     void loadDataset(const std::string& filepath);
