@@ -186,22 +186,10 @@ export function Terminal({ output, isRunning, scanMode = false }: TerminalProps)
   const hasInitializedRef = useRef<boolean>(false)
   const isUserScrollingRef = useRef<boolean>(false)
   const scrollAnimationFrameRef = useRef<number | null>(null)
-  const isProgrammaticScrollRef = useRef<boolean>(false)
+  const isProgrammaticScrollRef = useRef  <boolean>(false)
   
-  // Filter output in scan mode to show only file processing details
-  let filteredOutput = scanMode && isRunning
-    ? output.filter((line) => {
-        const trimmed = line.trim()
-        const parsed = parseLine(line)
-        
-        // Show file processing related lines
-        const isFileProcessing = parsed.type === 'file_processing' || 
-                                 parsed.type === 'info' && (trimmed.includes('Analyzing') || trimmed.includes('Pattern match') || trimmed.includes('Total files') || trimmed.includes('Loaded detection')) ||
-                                 parsed.type === 'success' && trimmed.includes('Result:') ||
-                                 parsed.type === 'header' && trimmed.includes('FILE SCAN')
-        
-        return isFileProcessing || parsed.type === 'header' || parsed.type === 'file_processing'
-      })
+    let filteredOutput = scanMode
+    ? output // Show everything in scan mode
     : output
 
 

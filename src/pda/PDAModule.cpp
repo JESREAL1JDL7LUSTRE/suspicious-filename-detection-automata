@@ -9,6 +9,9 @@
 #include <chrono>
 #include <sstream>
 // restore original includes only
+#include <algorithm>
+#include <random>
+#include <iomanip>
 
 namespace CS311 {
 
@@ -32,11 +35,15 @@ void PDAModule::defineCFG() {
     std::cout << "\nProduction Rules:" << std::endl;
     std::cout << "  S  → SYN A                (Start with SYN)" << std::endl;
     std::cout << "  A  → SYN-ACK B            (Must respond with SYN-ACK)" << std::endl;
-    std::cout << "  B  → ACK C                (Complete handshake with ACK)" << std::endl;
-    std::cout << "  C  → DATA C | FIN | ε     (Data transfer or finish)" << std::endl;
+    std::cout << "  B  → ACK " << (strictHandshakeOnly ? "ε" : "C") << "                (Complete handshake with ACK)" << std::endl;
+    if (strictHandshakeOnly) {
+        std::cout << "  (Strict mode: handshake-only; no DATA/FIN productions)" << std::endl;
+    } else {
+        std::cout << "  C  → DATA C | FIN | ε     (Data transfer or finish)" << std::endl;
+    }
     
-    std::cout << "\nTerminals: { SYN, SYN-ACK, ACK, DATA, FIN, RST }" << std::endl;
-    std::cout << "Non-terminals: { S, A, B, C }" << std::endl;
+    std::cout << "\nTerminals: { SYN, SYN-ACK, ACK" << (strictHandshakeOnly ? "" : ", DATA, FIN") << ", RST }" << std::endl;
+    std::cout << "Non-terminals: { S, A, B" << (strictHandshakeOnly ? "" : ", C") << " }" << std::endl;
     std::cout << "Start symbol: S" << std::endl;
     std::cout << std::endl;
 }
@@ -77,14 +84,18 @@ void PDAModule::buildPDA() {
 
 void PDAModule::printCFG() {
     std::cout << "\n[CFG — Canonical Form]" << std::endl;
-    std::cout << "V = { S, A, B, C }" << std::endl;
-    std::cout << "Σ = { SYN, SYN-ACK, ACK, DATA, FIN, RST }" << std::endl;
+    std::cout << "V = { S, A, B" << (strictHandshakeOnly ? "" : ", C") << " }" << std::endl;
+    std::cout << "Σ = { SYN, SYN-ACK, ACK" << (strictHandshakeOnly ? "" : ", DATA, FIN") << ", RST }" << std::endl;
     std::cout << "S = S" << std::endl;
     std::cout << "P = {" << std::endl;
     std::cout << "  S → SYN A," << std::endl;
     std::cout << "  A → SYN-ACK B," << std::endl;
-    std::cout << "  B → ACK C," << std::endl;
-    std::cout << "  C → DATA C | FIN | ε" << std::endl;
+    if (strictHandshakeOnly) {
+        std::cout << "  B → ACK" << std::endl;
+    } else {
+        std::cout << "  B → ACK C," << std::endl;
+        std::cout << "  C → DATA C | FIN | ε" << std::endl;
+    }
     std::cout << "}" << std::endl;
 }
 
@@ -133,13 +144,6 @@ bool PDAModule::processPacket(const std::string& packet, std::vector<std::string
     
     // State 1: Expecting SYN-ACK (Server response)
     else if (current == Q_SYN_RECEIVED && packet == "SYN-ACK" && top == "SYN") {
-        // SOUNDNESS CHECK: Missing precondition - SYN must be on stack before SYN-ACK
-        if (top != "SYN") {
-            std::cerr << "[INVARIANT VIOLATION] Missing precondition: SYN before SYN-ACK. "
-                     << "Stack top: " << top << std::endl;
-            pda.current_state = Q_ERROR;
-            return false;
-        }
         pda.push("SYN-ACK");
         pda.current_state = Q_SYNACK_RECEIVED;
         operations.push_back("PUSH(SYN-ACK) → q2");
@@ -148,13 +152,6 @@ bool PDAModule::processPacket(const std::string& packet, std::vector<std::string
     
     // State 2: Expecting ACK (Client acknowledgment)
     else if (current == Q_SYNACK_RECEIVED && packet == "ACK" && top == "SYN-ACK") {
-        // SOUNDNESS CHECK: Stack discipline - verify SYN-ACK is on top before popping
-        if (top != "SYN-ACK") {
-            std::cerr << "[INVARIANT VIOLATION] Missing precondition: SYN-ACK before ACK. "
-                     << "Stack top: " << top << std::endl;
-            pda.current_state = Q_ERROR;
-            return false;
-        }
         pda.pop();  // Pop SYN-ACK
         pda.pop();  // Pop SYN
         pda.current_state = Q_ACCEPT;
@@ -164,20 +161,22 @@ bool PDAModule::processPacket(const std::string& packet, std::vector<std::string
     
     // State 3: After handshake - allow data transfer
     else if (current == Q_ACCEPT) {
-        if (packet == "DATA") {
-            operations.push_back("ACCEPT DATA → q3");
-            return true;
-        }
-        else if (packet == "FIN") {
-            operations.push_back("ACCEPT FIN → q3");
-            return true;
-        }
-        else if (packet == "ACK") {
-            operations.push_back("ACCEPT ACK → q3");
-            return true;
+        if (!strictHandshakeOnly) {
+            if (packet == "DATA") {
+                operations.push_back("ACCEPT DATA → q3");
+                return true;
+            }
+            else if (packet == "FIN") {
+                operations.push_back("ACCEPT FIN → q3");
+                return true;
+            }
+            else if (packet == "ACK") {
+                operations.push_back("ACCEPT ACK → q3");
+                return true;
+            }
         }
         // Allow new handshake after completion
-        else if (packet == "SYN") {
+        if (!strictHandshakeOnly && packet == "SYN") {
             pda.push("SYN");
             pda.current_state = Q_SYN_RECEIVED;
             operations.push_back("NEW HANDSHAKE: PUSH(SYN) → q1");
@@ -197,9 +196,15 @@ bool PDAModule::processPacket(const std::string& packet, std::vector<std::string
         return false;
     }
     
-    // Invalid transition
+    // Invalid transition with formal logs
+    if (current == Q_SYN_RECEIVED && packet == "ACK") {
+        operations.push_back("[PRECONDITION MISSING] SYN before SYN-ACK");
+    } else if (current == Q_SYNACK_RECEIVED && packet == "ACK" && top != "SYN-ACK") {
+        operations.push_back("[STACK VIOLATION] ACK without SYN-ACK");
+    } else {
+        operations.push_back("ERROR: Invalid transition");
+    }
     pda.current_state = Q_ERROR;
-    operations.push_back("ERROR: Invalid transition");
     return false;
 }
 
@@ -348,24 +353,38 @@ void PDAModule::generateReport() {
     std::cout << "║          PDA MODULE - VALIDATION RESULTS                  ║" << std::endl;
     std::cout << "╚═══════════════════════════════════════════════════════════╝" << std::endl;
     
-    // Show sample TCP trace results (original style)
+    // Show sample TCP trace results (truly randomized from dataset)
     std::cout << "\n[SAMPLE TCP TRACE RESULTS (RANDOMIZED)]" << std::endl;
-    int sample_count = 0;
-    for (const auto& t : dataset) {
-        if (sample_count >= 5) break;
-        pda.reset();  // Reset PDA state before validation
-        bool result = validateSequence(t.sequence);
-        std::string validation = result ? "VALID" : "INVALID";
-        std::string reason = "";
-        if (!result && t.valid) {
-            reason = " (unexpected rejection)";
-        } else if (result && !t.valid) {
-            reason = " (unexpected acceptance)";
-        } else if (!result && !t.valid && !t.description.empty()) {
-            reason = " (" + t.description + ")";
+    {
+        const size_t K = 5;
+        std::vector<size_t> idx(dataset.size());
+        for (size_t i=0;i<idx.size();++i) idx[i]=i;
+        if (!idx.empty()) {
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::shuffle(idx.begin(), idx.end(), gen);
+            size_t sample_count = 0;
+            for (size_t j=0; j<idx.size() && sample_count<K; ++j) {
+                const auto& t = dataset[idx[j]];
+                pda.reset();
+                bool result = validateSequence(t.sequence);
+                std::string validation = result ? "VALID" : "INVALID";
+                std::string reason = "";
+                if (!result && t.valid) {
+                    reason = " (unexpected rejection)";
+                } else if (result && !t.valid) {
+                    reason = " (unexpected acceptance)";
+                } else if (!result && !t.valid && !t.description.empty()) {
+                    reason = " (" + t.description + ")";
+                }
+                std::ostringstream id;
+                id << "Trace_" << std::setw(3) << std::setfill('0') << (sample_count+1);
+                std::cout << "[" << id.str() << "] "
+                          << (t.trace_id.empty()? std::string("(no-id)") : t.trace_id)
+                          << ": " << validation << reason << std::endl;
+                sample_count++;
+            }
         }
-        std::cout << t.trace_id << ": " << validation << reason << std::endl;
-        sample_count++;
     }
     
     std::cout << "\n[VALIDATION METRICS]" << std::endl;
@@ -485,9 +504,9 @@ std::string PDAModule::exportGraphviz() const {
         ss << "    p_s" << Q_SYN_RECEIVED << " -> p_s" << Q_SYNACK_RECEIVED << " [label=\"SYN-ACK\"];\n";
     if (hasState(Q_SYNACK_RECEIVED) && hasState(Q_ACCEPT))
         ss << "    p_s" << Q_SYNACK_RECEIVED << " -> p_s" << Q_ACCEPT << " [label=\"ACK\"];\n";
-    if (hasState(Q_ACCEPT))
+    if (!strictHandshakeOnly && hasState(Q_ACCEPT))
         ss << "    p_s" << Q_ACCEPT << " -> p_s" << Q_ACCEPT << " [label=\"DATA,ACK,FIN\"];\n";
-    if (hasState(Q_ACCEPT) && hasState(Q_SYN_RECEIVED))
+    if (!strictHandshakeOnly && hasState(Q_ACCEPT) && hasState(Q_SYN_RECEIVED))
         ss << "    p_s" << Q_ACCEPT << " -> p_s" << Q_SYN_RECEIVED << " [label=\"SYN (new)\"];\n";
 
     ss << "  }\n";
