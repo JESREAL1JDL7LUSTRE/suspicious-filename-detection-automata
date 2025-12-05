@@ -34,6 +34,8 @@ int main(int argc, char* argv[]) {
     bool dfaVerbose = false;
     bool strictHandshake = false;
     std::vector<std::string> filePaths;
+    // Carry DFA-suspicious filenames across to PDA
+    std::vector<std::string> suspiciousGlobal;
     // Parse arguments: files imply scanMode; flag --dfa-verbose enables verbose DFA
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -106,11 +108,9 @@ int main(int argc, char* argv[]) {
             // NORMAL MODE: Use dataset files with structured steps
             // 1. Dataset Loading
             std::cout << "1. Dataset Loading" << std::endl;
-            std::cout << "[INFO] Reading filename dataset: archive/Malicious_file_trick_detection.jsonl" << std::endl;
-            dfaModule.loadDataset("archive/Malicious_file_trick_detection.jsonl");
-            std::cout << "[INFO] Integrating CSVs: archive/combined_random.csv (type-labeled) + archive/malware.csv" << std::endl;
-            dfaModule.integrateCombinedAndMalwareCSVs("archive/combined_random.csv", "archive/malware.csv");
-            std::cout << "✓ SUCCESS — Evaluation sources: JSONL + combined_random + malware (no benign.csv)" << std::endl;
+            std::cout << "[INFO] Reading unified dataset: archive/unified_dataset.jsonl" << std::endl;
+            dfaModule.loadDataset("archive/unified_dataset.jsonl");
+            std::cout << "✓ SUCCESS — Single-source unified dataset loaded" << std::endl;
             std::cout << "✓ SUCCESS — Total filenames staged: " << dfaModule.getMetrics().filenames_tested << std::endl;
             std::cout << std::endl;
 
@@ -149,6 +149,11 @@ int main(int argc, char* argv[]) {
             // 6. Sample Filename Detection (Randomized)
             std::cout << "6. Sample Filename Detection (Randomized)" << std::endl;
             dfaModule.testPatterns();
+
+            // 6b. DFA→PDA: Classify dataset and collect suspicious filenames
+            std::cout << "6b. DFA Classification → Collect suspicious filenames" << std::endl;
+            suspiciousGlobal = dfaModule.classifyDatasetAndReturnDetected();
+            std::cout << "  [INFO] DFA flagged " << suspiciousGlobal.size() << " entries as suspicious" << std::endl;
 
             // 7. DFA Summary
             std::cout << "7. DFA Summary" << std::endl;
@@ -190,10 +195,15 @@ int main(int argc, char* argv[]) {
     
     PDAModule pdaModule;
     try {
-        // 1. Loading TCP Trace Dataset
+        // 1. Loading TCP Trace Dataset (augmented from other archives)
         std::cout << "1. Loading TCP Trace Dataset" << std::endl;
-        std::cout << "[INFO] Reading: archive/tcp_handshake_traces_expanded.jsonl" << std::endl;
-        pdaModule.loadDataset("archive/tcp_handshake_traces_expanded.jsonl");
+        std::cout << "[INFO] Reading: archive/unified_dataset.jsonl" << std::endl;
+        pdaModule.loadDataset("archive/unified_dataset.jsonl");
+        // Filter PDA dataset to only those flagged by DFA (trace_id equals filename)
+        {
+            std::set<std::string> suspiciousSet(suspiciousGlobal.begin(), suspiciousGlobal.end());
+            pdaModule.filterDatasetByTraceIds(suspiciousSet);
+        }
         if (strictHandshake) {
             std::cout << "[INFO] Strict handshake-only CFG enabled" << std::endl;
             pdaModule.setStrictHandshake(true);

@@ -312,6 +312,24 @@ void PDAModule::testAllTraces() {
     std::cout << std::endl;
 }
 
+void PDAModule::filterDatasetByTraceIds(const std::set<std::string>& ids) {
+    if (ids.empty()) return;
+    std::vector<TCPTrace> filtered;
+    filtered.reserve(dataset.size());
+    for (const auto& t : dataset) {
+        if (ids.count(t.trace_id) > 0) {
+            filtered.push_back(t);
+        }
+    }
+    dataset.swap(filtered);
+    metrics.total_traces = (int)dataset.size();
+    metrics.valid_traces = 0;
+    metrics.invalid_traces = 0;
+    for (const auto& t : dataset) {
+        if (t.valid) metrics.valid_traces++; else metrics.invalid_traces++;
+    }
+}
+
 void PDAModule::showStackOperations(const std::vector<std::string>& sequence) {
     pda.reset();
     

@@ -82,6 +82,9 @@ public:
     const DFAMetrics& getMetrics() const { return metrics; }
     const std::vector<std::string>& getPatternNames() const { return pattern_names; }
     const std::vector<std::string>& getRegexPatterns() const { return regex_patterns; }
+
+    // NEW: Classify all loaded dataset filenames and return those flagged by DFA
+    std::vector<std::string> classifyDatasetAndReturnDetected();
 };
 
 } // namespace CS311

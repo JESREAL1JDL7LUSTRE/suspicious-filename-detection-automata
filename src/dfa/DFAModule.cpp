@@ -53,6 +53,36 @@ void DFAModule::loadDataset(const std::string& filepath) {
     }
 }
 
+std::vector<std::string> DFAModule::classifyDatasetAndReturnDetected() {
+    std::vector<std::string> detected;
+    detected.reserve(dataset.size());
+    auto start_time = std::chrono::high_resolution_clock::now();
+    int tp = 0, fp = 0, fn = 0; // aggregate simple stats relative to dataset label
+    for (const auto& entry : dataset) {
+        std::string matched;
+        bool isSuspicious = testFilenameWithDFA(entry.filename, matched);
+        if (isSuspicious) {
+            detected.push_back(entry.filename);
+        }
+        if (entry.is_malicious) {
+            if (isSuspicious) tp++; else fn++;
+        } else {
+            if (isSuspicious) fp++;
+        }
+    }
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto dur_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+    metrics.true_positives = tp;
+    metrics.false_positives = fp;
+    metrics.false_negatives = fn;
+    int total = metrics.filenames_tested;
+    int correct = tp + (total - tp - fp - fn);
+    metrics.detection_accuracy = total > 0 ? (100.0 * correct / total) : 0.0;
+    metrics.total_execution_time_ms = (double)dur_ms;
+    metrics.avg_matching_time_ms = total > 0 ? (double)dur_ms / total : 0.0;
+    return detected;
+}
+
 void DFAModule::definePatterns() {
     std::cout << "[INFO] Defining regex patterns..." << std::endl;
     
