@@ -73,6 +73,8 @@ int main(int argc, char* argv[]) {
     std::cout << std::endl;
     
     DFAModule dfaModule;
+    // Build a single combined DFA for all substring flags
+    dfaModule.setCombineAllPatterns(true);
     try {
         // Ensure output directory exists
         std::filesystem::create_directories("output");

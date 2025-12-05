@@ -1,29 +1,21 @@
-PS D:\SCHOOL\Automata\suspicious-filename-detection-automata> .\simulator.exe
 Starting simulator...
 ╔══════════════════════════════════════════════════════════════╗
 ║      CS311 CHOMSKY HIERARCHY SECURITY SIMULATOR             ║
 ║      Filename Detection (DFA) & TCP Validation (PDA)         ║
 ╚══════════════════════════════════════════════════════════════╝
-
 ╔═══════════════════════════════════╗
 MODULE 1 — Filename Detection (DFA)
 ╚═══════════════════════════════════╝
 Chomsky Type-3: Regular Language
-
 Uses Deterministic Finite Automaton (DFA)
 • Memory: finite-state
 • Function: pattern matching
-
 1. Dataset Loading
 [INFO] Reading unified dataset: archive/unified_dataset.jsonl
 [INFO] Loading filename dataset: archive/unified_dataset.jsonl
-[SUCCESS] Loaded 12199 filename entries
-  Malicious: 10228, Benign: 1971
-  Unique extensions: 106
+✓[SUCCESS] Loaded 12199 filename entries
 [INFO] Loading filename dataset: archive/unified_dataset.jsonl
-[SUCCESS] Loaded 12199 filename entries
-  Malicious: 10228, Benign: 1971
-  Unique extensions: 106
+✓[SUCCESS] Loaded 12199 filename entries
   Top extensions:
     .bin: 11924
     .exe: 98
@@ -37,99 +29,19 @@ Uses Deterministic Finite Automaton (DFA)
     .b64: 4
 ✓ SUCCESS — Single-source unified dataset loaded
 ✓ SUCCESS — Total filenames staged: 12199
-
 2. Regex Pattern Definition
 [INFO] Defining regex patterns...
-
-[TOKENIZATION DISCIPLINE]
-  Method: Per-character tokenization
-  Alphabet: Printable ASCII (32-126)
-  Processing: Sequential character-by-character DFA transitions
-  Pattern 1: combined_patterns ('(exe|scr|bat|vbs|update|password|stealer|setup|patch)')
-[SUCCESS] Defined 1 patterns
-
-3. Regex → NFA (Thompson’s Construction)
-[INFO] Converting regex to NFAs (Thompson's Construction)...
-  Built NFA for '(exe|scr|bat|vbs|update|password|stealer|setup|patch)' - 55 states (time: 83 μs)
-[SUCCESS] Built 1 NFAs
-  Total NFA states: 55
-  Total time: 922 μs
-  Complexity: O(|regex|) per pattern (Thompson's Construction)
-
-✓ SUCCESS — Total NFA states: 55
-
-4. NFA → DFA (Subset Construction)
-[INFO] Converting NFAs to DFAs (Subset Construction)...
-  Converted NFA 1 -> DFA with 107 states (time: 30756 μs)
-[SUCCESS] Built 1 DFAs
-  Total states before minimization: 107
-  Total time: 33929 μs
-  Complexity: O(2^n) worst-case, where n = NFA states
-  Empirical: 55 NFA states → 107 DFA states
-
-✓ SUCCESS — Total DFA states: 107
-
-5. DFA Minimization (Hopcroft)
-[INFO] Minimizing DFAs (Hopcroft's Algorithm)...
-  DFA 1: refinement steps = 52, final equivalence classes = 54
-[SUCCESS] Minimized DFAs (Hopcroft)
-  States after minimization: 54
-  Reduction: 49.5327%
-  Total time: 299666 μs
-  Complexity: O(k n log n) where k = |alphabet|, n = |DFA states|
-  Empirical: 107 states → 54 states
-
-[OK] Wrote Regular Grammar: output/grammar_0.txt
-[OK] Wrote Regular Grammar: output/grammar_0.txt
-6. Sample Filename Detection (Randomized)
-[INFO] Testing 12199 filenames using DFAs...
-[SUCCESS] Testing complete
-  True Positives: 200
-  Detection accuracy: 1.63948%
-
-[Sample True Positives]:
-  report.pdf.exe (matched: double_extension)
-  invoice.doc.scr (matched: double_extension)
-  budget.xlsx.vbs (matched: double_extension)
-  resume.pdf.bat (matched: double_extension)
-  contract.doc.pif (matched: double_extension)
-
-[Sample False Negatives]:
-  doc.pdf\u202eexe
-  safe.doc\uff25\uff38\uff25
-  report .exe
-  update.iso
-  docx.pdf\u202exex
-
-6b. DFA Classification → Collect suspicious filenames
-  [INFO] DFA flagged 200 entries as suspicious
-7. DFA Summary
-True Positives:   200
-False Negatives:   10028
-Accuracy:      17.7965%
-
-Execution Time:
-  Total:        101 ms
-  Per file:     0.00827937 ms
-
-
-╔═══════════════════════════════════════════════════════════╗
-║          DFA MODULE - DETECTION RESULTS                   ║
-╚═══════════════════════════════════════════════════════════╝
-
 [SAMPLE FILENAME RESULTS (RANDOMIZED)]
-[File_001]  "1af65e47992b406fb9167221301abe0aa8d65528abbc10380f1059b0a1487111.bin" → BENIGN
-[File_002]  "9c7173528ef4062fc8817daaed2fb2900618f350ea60bc104c05c27ec2900a12.bin" → BENIGN
-[File_003]  "dd42efe328eda213cb8247e07271b7767065cfc85ada79deb33bf6701c060494.bin" → BENIGN
-[File_004]  "35292f7ecacb0db9a2ef4188c704dfa309a5b6e695a492fa2134a7c3ca49cc5d.bin" → BENIGN
-[File_005]  "0539ea2e6a3fd9c60035b14ed29a1e627abd9129ed4052fec8efc7c17c15eb8f.bin" → BENIGN
-
+[File_001]  "5a4f8c9e940827b99d53b9d106c044426d3a27de78baf8dabf88fb675283e410.bin" → BENIGN
+[File_002]  "2efa547e5039f0edbbc7e4350160c01d6cf5fcb226ce2aa49b718f92d2a90531.bin" → BENIGN
+[File_003]  "878eb5423f9178630120b092231645a5f3086fc67611f3d461424a4898ce5d8a.bin" → BENIGN
+[File_004]  "ce33bb3d6fcc837c4666755a522cbcd938e8681635b769e49a99912617588e2f.bin" → BENIGN
+[File_005]  "2c37d78609450c02d998c9e27ad6bc594ae4bf5ae9f789011f6557aa0c50d05e.bin" → BENIGN
 [CONFUSION MATRIX DEFINITIONS]
   TP (True Positive):  Malicious file correctly detected as malicious
   FP (False Positive): Benign file incorrectly detected as malicious
   TN (True Negative):  Benign file correctly detected as benign
   FN (False Negative): Malicious file incorrectly detected as benign
-
 [DETECTION METRICS]
   ✓ True Positives (TP):   200
   ✗ False Positives (FP):  0
@@ -139,68 +51,52 @@ Execution Time:
   Recall:                  1.95542%
   F1 Score:                3.83583%
   Detection Rate:          17.7965%
-
 [TOKENIZATION]
   Mode: per-character DFA
   Alphabet (Σ): {  , !, ", #, $, %, &, ', (, ), *, +, ,, -, ., /, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, :, ;, <, =, >, ?, @, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, [, \, ], ^, _, `, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, {, |, }, ~ }
-
 [STATE REDUCTION]
   Original DFA states:    107
   After Minimization:     54 (-49.5327% vs original)
-
 [RESOURCE METRICS]
   Estimated DFA memory:   81 KB (83376 bytes)
-
 [PERFORMANCE]
   Patterns:               1
   Files tested:           12199
-  Total execution time:   101 ms (wall-clock)
-  Average per file:       0.00827937 ms
+  Total execution time:   119 ms (wall-clock)
+  Average per file:       0.0097549 ms
   Note: Times measured using std::chrono::high_resolution_clock
-
 [PATTERN → DFA MAPPING]
   Pattern '(exe|scr|bat|vbs|update|password|stealer|setup|patch)' (combined_patterns) → DFA 0
-
 [PER-PATTERN METRICS]
-
-
 ╔═══════════════════════════════════╗
 MODULE 2 — TCP Protocol Validation (PDA)
 ╚═══════════════════════════════════╝
 Chomsky Type-2: Context-Free Language
-
 Uses Pushdown Automaton (PDA)
 • Memory: stack
 • Function: sequence validation
-
 1. Loading TCP Trace Dataset
 [INFO] Reading: archive/unified_dataset.jsonl
 [INFO] Loading TCP trace dataset: archive/unified_dataset.jsonl
-[SUCCESS] Loaded 12199 TCP traces
+✓[SUCCESS] Loaded 12199 TCP traces
   Valid sequences: 1971
   Invalid sequences: 10228
 ✓ SUCCESS — Loaded 200 traces
 Valid:   0
 Invalid: 200
-
 2. CFG for TCP 3-Way Handshake
 [INFO] Defining Context-Free Grammar for TCP Handshake...
-
 ╔════════════════════════════════════════════════════════╗
 ║  CONTEXT-FREE GRAMMAR (Type-2 Chomsky Hierarchy)       ║
 ╚════════════════════════════════════════════════════════╝
-
 Production Rules:
   S  → SYN A                (Start with SYN)
   A  → SYN-ACK B            (Must respond with SYN-ACK)
   B  → ACK C                (Complete handshake with ACK)
   C  → DATA C | FIN | ε     (Data transfer or finish)
-
 Terminals: { SYN, SYN-ACK, ACK, DATA, FIN, RST }
 Non-terminals: { S, A, B, C }
 Start symbol: S
-
-
 [CFG — Canonical Form]
 V = { S, A, B, C }
 Σ = { SYN, SYN-ACK, ACK, DATA, FIN, RST }
@@ -213,7 +109,6 @@ P = {
 }
 3. PDA Structure
 [INFO] Building PDA from CFG...
-
 [PDA STRUCTURE]
   States: 5
     q0: Initial state
@@ -221,104 +116,72 @@ P = {
     q2: SYN-ACK received (expects ACK)
     q3: Handshake complete (ACCEPTING)
     qE: Error state (REJECTING)
-
 [STACK OPERATIONS]
   PUSH SYN:      On receiving SYN in q0
   PUSH SYN-ACK:  On receiving SYN-ACK in q1
   POP ALL:       On receiving ACK in q2 (pops both SYN-ACK and SYN)
   Stack empty:   Required for acceptance (state-based + empty stack)
-
 [NOTE] Both SYN and SYN-ACK are pushed to visualize stack depth
   for pedagogical purposes. In production, only SYN might be pushed,
   with transitions checking SYN-ACK before popping on ACK.
-
-[SUCCESS] PDA constructed from CFG
-
+✓[SUCCESS] PDA constructed from CFG
 [OK] Wrote PDA construction log: output/pda_construction.txt
 4. PDA Validation — Sample Randomized Results
 [INFO] Validating 200 TCP traces with PDA...
-[SUCCESS] Validation complete
+✓[SUCCESS] Validation complete
   Accuracy: 100%
-
 5. Stack Trace Examples
-
 ╔════════════════════════════════════════════════════════╗
 ║  STACK TRACE VISUALIZATION                             ║
 ╚════════════════════════════════════════════════════════╝
-
 Input sequence: [SYN, SYN-ACK, ACK]
-
 Step-by-step execution:
   Initial: State=q0, Stack=[BOTTOM]
   Step 1: Input='SYN'
-         State: q0 → q1
-         Operation: PUSH(SYN) → q1
          Stack depth: 1
   Step 2: Input='SYN-ACK'
-         State: q1 → q2
-         Operation: PUSH(SYN-ACK) → q2
          Stack depth: 2
   Step 3: Input='ACK'
-         State: q2 → q3
-         Operation: POP(SYN-ACK), POP(SYN) → q3
          Stack depth: 0
-
-  Final state: q3
   Stack depth: 0
   Result: ✓ VALID
-
-
 ╔════════════════════════════════════════════════════════╗
 ║  STACK TRACE VISUALIZATION                             ║
 ╚════════════════════════════════════════════════════════╝
-
 Input sequence: [SYN, ACK]
-
 Step-by-step execution:
   Initial: State=q0, Stack=[BOTTOM]
   Step 1: Input='SYN'
-         State: q0 → q1
-         Operation: PUSH(SYN) → q1
          Stack depth: 1
   Step 2: Input='ACK'
-         State: q1 → q4
          Operation: [PRECONDITION MISSING] SYN before SYN-ACK
          Stack depth: 1 [ERROR]
-
-  Final state: q4
   Stack depth: 1
   Result: ✗ INVALID
-
 6. PDA Summary
-
 ╔═══════════════════════════════════════════════════════════╗
 ║          PDA MODULE - VALIDATION RESULTS                  ║
 ╚═══════════════════════════════════════════════════════════╝
-
 [SAMPLE TCP TRACE RESULTS (RANDOMIZED)]
-[Trace_001] file.exe\u202exet.pdf: INVALID (Synthetic invalid handshake for malicious filename)
-[Trace_002] config.yaml:stego.exe: INVALID (Synthetic invalid handshake for malicious filename)
-[Trace_003] file.docx:quantum.b64: INVALID (Synthetic invalid handshake for malicious filename)
-[Trace_004] file.doc:malware.js: INVALID (Synthetic invalid handshake for malicious filename)
-[Trace_005] file.pdf.hex: INVALID (Synthetic invalid handshake for malicious filename)
-
+[Trace_001] script.js.exe: INVALID (Synthetic invalid handshake for malicious filename)
+[Trace_002] encoded.exe.b64: INVALID (Synthetic invalid handshake for malicious filename)
+[Trace_003] file.txt....[U+202F]....exe: INVALID (Synthetic invalid handshake for malicious filename)
+[Trace_004] installer.msi.exe: INVALID (Synthetic invalid handshake for malicious filename)
+[Trace_005] config.xml.ws: INVALID (Synthetic invalid handshake for malicious filename)
 [VALIDATION METRICS]
   ✓ Valid accepted:       0 / 0
   ✓ Invalid rejected:     200 / 200
   ✗ False positives:      0
   ✗ False negatives:      0
   Validation accuracy:    100%
-
 [STACK METRICS]
   Average stack depth:    0.6
   Maximum stack depth:    2
-
 [CONFUSION MATRIX DEFINITIONS]
   TP (True Positive):  Valid trace correctly accepted
   FP (False Positive): Invalid trace incorrectly accepted
   TN (True Negative):  Invalid trace correctly rejected
   FN (False Negative): Valid trace incorrectly rejected
-
 [CONFUSION MATRIX]
   ✓ True Positives (TP):   0
   ✗ False Positives (FP):  0
@@ -327,24 +190,20 @@ Step-by-step execution:
   Precision:               0%
   Recall:                  0%
   F1 Score:                0%
-
 [PERFORMANCE]
   Total traces:           200
-  Total execution time:   0.128 ms (wall-clock)
-  Average per trace:      0.00064 ms
+  Total execution time:   0.578 ms (wall-clock)
+  Average per trace:      0.00289 ms
   Note: Times measured using std::chrono::high_resolution_clock
-
 [OK] Wrote minimized DFA DOT: output/dfa_min_0.dot (pattern: combined_patterns)
 [OK] Wrote PDA DOT: output/pda.dot
 [OK] Wrote combined DOT: output/graph_from_run.dot
 [OK] Wrote output/dfa_min_0.json
 [OK] Wrote output/pda.json
 [OK] Wrote output/automata.json
-
 +-----------------------------------+
 | CHOMSKY HIERARCHY DEMONSTRATION |
 +-----------------------------------+
-
 ┌─────────────────────┬──────────────────┬──────────────────┐
 │ Aspect              │ DFA (Regular)    │ PDA (Context-Free)│
 ├─────────────────────┼──────────────────┼──────────────────┤
@@ -356,8 +215,5 @@ Step-by-step execution:
 │ Example task        │ *.exe detection  │ SYN-ACK pairing  │
 │ Complexity          │ O(n)             │ O(n)             │
 └─────────────────────┴──────────────────┴──────────────────┘
-
 HAHAHHA
-
 All automata saved to /output/.
-PS D:\SCHOOL\Automata\suspicious-filename-detection-automata> 

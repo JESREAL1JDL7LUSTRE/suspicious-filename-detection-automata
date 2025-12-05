@@ -126,8 +126,23 @@ void DFAModule::definePatterns() {
     regex_patterns.push_back("patch");
     pattern_names.push_back("deceptive_patch");
     
+    // Optionally collapse into a single combined alternation to produce one DFA
+    if (combineAll) {
+        if (!regex_patterns.empty()) {
+            std::ostringstream alt;
+            alt << "(";
+            for (size_t i = 0; i < regex_patterns.size(); ++i) {
+                if (i) alt << "|";
+                alt << regex_patterns[i];
+            }
+            alt << ")";
+            regex_patterns = { alt.str() };
+            pattern_names = { "combined_patterns" };
+        }
+    }
+
     metrics.total_patterns = (int)regex_patterns.size();
-    
+
     std::cout << "\n[TOKENIZATION DISCIPLINE]" << std::endl;
     std::cout << "  Method: Per-character tokenization" << std::endl;
     std::cout << "  Alphabet: Printable ASCII (32-126)" << std::endl;

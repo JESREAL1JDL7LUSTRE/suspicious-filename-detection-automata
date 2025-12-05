@@ -12,11 +12,7 @@ export function useGraphLoader() {
     () => [
       'automata.json',
       'pda.json',
-      'dfa_0.json',
-      'dfa_1.json',
-      'dfa_2.json',
-      'dfa_3.json',
-      'dfa_4.json'
+      'dfa_min_0.json'
     ],
     []
   )
