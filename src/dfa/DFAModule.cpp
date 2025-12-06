@@ -21,6 +21,11 @@ namespace CS311 {
 
 DFAModule::DFAModule() {}
 
+void DFAModule::clearDataset() {
+    dataset.clear();
+    metrics = DFAMetrics{};
+}
+
 void DFAModule::loadDataset(const std::string& filepath) {
     dataset = JSONParser::loadFilenameDataset(filepath);
     metrics.filenames_tested = (int)dataset.size();
@@ -51,6 +56,36 @@ void DFAModule::loadDataset(const std::string& filepath) {
             std::cout << "    ." << exts[i].first << ": " << exts[i].second << std::endl;
         }
     }
+}
+
+std::vector<std::string> DFAModule::classifyDatasetAndReturnDetected() {
+    std::vector<std::string> detected;
+    detected.reserve(dataset.size());
+    auto start_time = std::chrono::high_resolution_clock::now();
+    int tp = 0, fp = 0, fn = 0; // aggregate simple stats relative to dataset label
+    for (const auto& entry : dataset) {
+        std::string matched;
+        bool isSuspicious = testFilenameWithDFA(entry.filename, matched);
+        if (isSuspicious) {
+            detected.push_back(entry.filename);
+        }
+        if (entry.is_malicious) {
+            if (isSuspicious) tp++; else fn++;
+        } else {
+            if (isSuspicious) fp++;
+        }
+    }
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto dur_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+    metrics.true_positives = tp;
+    metrics.false_positives = fp;
+    metrics.false_negatives = fn;
+    int total = metrics.filenames_tested;
+    int correct = tp + (total - tp - fp - fn);
+    metrics.detection_accuracy = total > 0 ? (100.0 * correct / total) : 0.0;
+    metrics.total_execution_time_ms = (double)dur_ms;
+    metrics.avg_matching_time_ms = total > 0 ? (double)dur_ms / total : 0.0;
+    return detected;
 }
 
 void DFAModule::definePatterns() {
@@ -96,8 +131,23 @@ void DFAModule::definePatterns() {
     regex_patterns.push_back("patch");
     pattern_names.push_back("deceptive_patch");
     
+    // Optionally collapse into a single combined alternation to produce one DFA
+    if (combineAll) {
+        if (!regex_patterns.empty()) {
+            std::ostringstream alt;
+            alt << "(";
+            for (size_t i = 0; i < regex_patterns.size(); ++i) {
+                if (i) alt << "|";
+                alt << regex_patterns[i];
+            }
+            alt << ")";
+            regex_patterns = { alt.str() };
+            pattern_names = { "combined_patterns" };
+        }
+    }
+
     metrics.total_patterns = (int)regex_patterns.size();
-    
+
     std::cout << "\n[TOKENIZATION DISCIPLINE]" << std::endl;
     std::cout << "  Method: Per-character tokenization" << std::endl;
     std::cout << "  Alphabet: Printable ASCII (32-126)" << std::endl;

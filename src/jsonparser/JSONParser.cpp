@@ -1,5 +1,9 @@
 // Simple JSONL parser implementation (lightweight, tolerant)
 #include "JSONParser.h"
+#include <set>
+#include <algorithm>
+#include <sstream>
+#include <cctype>
 
 namespace CS311 {
 
@@ -21,8 +25,33 @@ FilenameEntry JSONParser::parseFilenameEntrySimple(const std::string& line) {
     entry.technique = extractString(line, "technique");
     entry.category = extractString(line, "category");
     entry.detected_by = extractString(line, "detected_by");
-    // default malicious true
-    entry.is_malicious = true;
+    
+    // DATASET FIELD VALIDATION: Explicitly validate is_malicious from source
+    size_t posMalicious = line.find("\"is_malicious\"");
+    if (posMalicious != std::string::npos) {
+        size_t colon = line.find(':', posMalicious);
+        if (colon != std::string::npos) {
+            size_t start = line.find_first_not_of(" \t", colon + 1);
+            if (start != std::string::npos) {
+                if (line.compare(start, 4, "true") == 0) {
+                    entry.is_malicious = true;
+                } else if (line.compare(start, 5, "false") == 0) {
+                    entry.is_malicious = false;
+                } else {
+                    // Default to true if value is malformed
+                    entry.is_malicious = true;
+                }
+            } else {
+                entry.is_malicious = true; // default
+            }
+        } else {
+            entry.is_malicious = true; // default
+        }
+    } else {
+        // Field not found, default to true
+        entry.is_malicious = true;
+    }
+    
     return entry;
 }
 
@@ -76,18 +105,49 @@ std::vector<FilenameEntry> JSONParser::loadFilenameDataset(const std::string& fi
     std::cout << "[INFO] Loading filename dataset: " << filepath << std::endl;
     std::string line;
     int line_number = 0;
+    int malicious_count = 0;
+    int benign_count = 0;
+    std::set<std::string> extensions;
+    
     while (std::getline(file, line)) {
         line_number++;
         if (line.empty()) continue;
         try {
             FilenameEntry entry = parseFilenameEntrySimple(line);
-            if (!entry.filename.empty()) dataset.push_back(entry);
+            if (!entry.filename.empty()) {
+                dataset.push_back(entry);
+                if (entry.is_malicious) malicious_count++;
+                else benign_count++;
+                
+                // Extract extension for coverage analysis
+                size_t dot_pos = entry.filename.find_last_of('.');
+                if (dot_pos != std::string::npos && dot_pos < entry.filename.length() - 1) {
+                    std::string ext = entry.filename.substr(dot_pos + 1);
+                    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                    extensions.insert(ext);
+                }
+            }
         } catch (const std::exception& e) {
             std::cerr << "[WARNING] Error at line " << line_number << ": " << e.what() << std::endl;
         }
     }
     file.close();
+    
+    // SANITY CHECKS: Filename distribution and extension coverage
     std::cout << "[SUCCESS] Loaded " << dataset.size() << " filename entries" << std::endl;
+    std::cout << "  Malicious: " << malicious_count << ", Benign: " << benign_count << std::endl;
+    std::cout << "  Unique extensions: " << extensions.size() << std::endl;
+    if (extensions.size() > 0 && extensions.size() <= 20) {
+        std::cout << "  Extensions: ";
+        bool first = true;
+        for (const auto& ext : extensions) {
+            if (!first) std::cout << ", ";
+            std::cout << ext;
+            first = false;
+        }
+        std::cout << std::endl;
+    }
+    
     return dataset;
 }
 
@@ -115,6 +175,57 @@ std::vector<TCPTrace> JSONParser::loadTCPDataset(const std::string& filepath) {
     int valid_count = 0;
     for (const auto& t : dataset) if (t.valid) valid_count++;
     std::cout << "[SUCCESS] Loaded " << dataset.size() << " TCP traces" << std::endl;
+    std::cout << "  Valid sequences: " << valid_count << std::endl;
+    std::cout << "  Invalid sequences: " << (dataset.size() - valid_count) << std::endl;
+    return dataset;
+}
+
+std::vector<TCPTrace> JSONParser::loadTCPDatasetCSV(const std::string& filepath) {
+    std::vector<TCPTrace> dataset;
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        std::cerr << "[ERROR] Could not open file: " << filepath << std::endl;
+        return dataset;
+    }
+    std::cout << "[INFO] Loading TCP trace dataset (CSV): " << filepath << std::endl;
+    std::string line;
+    // Read header
+    if (!std::getline(file, line)) {
+        file.close();
+        return dataset;
+    }
+    // Expected header: trace_id,sequence,valid,description,category
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        std::istringstream ss(line);
+        std::string trace_id, sequence, valid, description, category;
+        if (!std::getline(ss, trace_id, ',')) continue;
+        if (!std::getline(ss, sequence, ',')) continue;
+        if (!std::getline(ss, valid, ',')) valid = "false";
+        if (!std::getline(ss, description, ',')) description = "";
+        if (!std::getline(ss, category, ',')) category = "";
+        // Parse sequence: pipe-delimited tokens
+        TCPTrace t;
+        t.trace_id = trace_id;
+        size_t start = 0;
+        while (start <= sequence.size()) {
+            size_t sep = sequence.find('|', start);
+            std::string token = sequence.substr(start, sep == std::string::npos ? std::string::npos : sep - start);
+            if (!token.empty()) t.sequence.push_back(token);
+            if (sep == std::string::npos) break;
+            start = sep + 1;
+        }
+        // valid flag
+        std::string v = valid;
+        std::transform(v.begin(), v.end(), v.begin(), ::tolower);
+        t.valid = (v == "true" || v == "1");
+        t.description = description;
+        t.category = category;
+        dataset.push_back(std::move(t));
+    }
+    file.close();
+    int valid_count = 0; for (const auto& t : dataset) if (t.valid) valid_count++;
+    std::cout << "[SUCCESS] Loaded " << dataset.size() << " TCP traces (CSV)" << std::endl;
     std::cout << "  Valid sequences: " << valid_count << std::endl;
     std::cout << "  Invalid sequences: " << (dataset.size() - valid_count) << std::endl;
     return dataset;

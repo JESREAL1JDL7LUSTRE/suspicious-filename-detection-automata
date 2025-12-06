@@ -2,6 +2,7 @@ CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -O2 -I./src -I./src/dfa -I./src/pda -I./src/regexparser -I./src/jsonparser
 TARGET = simulator
 SHELL := bash
+
 SRCDIR = src
 OBJDIR = obj
 
@@ -13,6 +14,7 @@ SOURCES = \
 	$(SRCDIR)/dfa/DFAModule.cpp \
 	$(SRCDIR)/jsonparser/JSONParser.cpp \
 	$(SRCDIR)/AutomataJSON.cpp
+
 # Map each source file `src/.../file.cpp` to `obj/.../file.o`
 OBJECTS = $(patsubst $(SRCDIR)/%.cpp,$(OBJDIR)/%.o,$(SOURCES))
 
@@ -21,7 +23,9 @@ all: $(TARGET)
 $(TARGET): $(OBJECTS)
 	$(CXX) $(OBJECTS) -o $(TARGET)
 
+# Modified rule: create directory before compiling
 $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
+	@if not exist "$(subst /,\,$(dir $@))" mkdir "$(subst /,\,$(dir $@))"
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:

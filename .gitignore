@@ -54,3 +54,4 @@ Makefile
 *.o
 *.so
 
+mock_files

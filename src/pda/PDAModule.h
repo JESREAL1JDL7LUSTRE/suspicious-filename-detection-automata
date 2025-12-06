@@ -50,6 +50,10 @@ public:
     void generateReport();
     // Export Graphviz DOT representing the PDA structure
     std::string exportGraphviz() const;
+    // Filter loaded dataset by a set of trace_ids (e.g., filenames)
+    void filterDatasetByTraceIds(const std::set<std::string>& ids);
+    // Synthesize traces for given filenames (valid=true for good, false for bad)
+    void synthesizeTracesForFilenames(const std::vector<std::string>& filenames, bool valid);
     
     // Getters
     const PDAMetrics& getMetrics() const { return metrics; }

@@ -24,6 +24,7 @@ private:
     std::vector<DFA> dfas;
     std::vector<DFA> minimized_dfas;
     DFAMetrics metrics;
+    bool combineAll = false; // when true, build a single combined DFA for all patterns
     // Per-pattern evaluation metrics
     struct PatternMetrics { int tp=0; int fp=0; int fn=0; int tn=0; double precision=0; double recall=0; double f1=0; };
     std::map<std::string, PatternMetrics> perPattern;
@@ -44,6 +45,9 @@ private:
 
 public:
     DFAModule();
+    void setCombineAllPatterns(bool on) { combineAll = on; }
+    // Clear current staged filename dataset and reset basic metrics
+    void clearDataset();
     
     // Module pipeline
     void loadDataset(const std::string& filepath);
@@ -82,6 +86,9 @@ public:
     const DFAMetrics& getMetrics() const { return metrics; }
     const std::vector<std::string>& getPatternNames() const { return pattern_names; }
     const std::vector<std::string>& getRegexPatterns() const { return regex_patterns; }
+
+    // NEW: Classify all loaded dataset filenames and return those flagged by DFA
+    std::vector<std::string> classifyDatasetAndReturnDetected();
 };
 
 } // namespace CS311
