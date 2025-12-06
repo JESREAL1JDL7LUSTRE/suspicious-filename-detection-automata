@@ -243,7 +243,7 @@ app.post('/api/scan', async (req, res) => {
   
   try {
     // Prepare file paths as command-line arguments
-    // Escape paths with spaces for Windows
+    // CRITICAL: Include --dfa-verbose to enable state transitions in output
     const args = ['--dfa-verbose', ...filePaths.map(path => {
       if (path.includes(' ')) {
         return `"${path}"`
@@ -251,7 +251,7 @@ app.post('/api/scan', async (req, res) => {
       return path
     })]
     
-    console.log(`Spawning simulator for scan with ${args.length} files`)
+    console.log(`Spawning simulator for scan with ${filePaths.length} files (verbose mode enabled)`)
     
     // Spawn the simulator with file paths as arguments
     let simulator
