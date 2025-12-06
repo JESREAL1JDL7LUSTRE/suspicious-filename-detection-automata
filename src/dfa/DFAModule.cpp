@@ -212,15 +212,15 @@ void DFAModule::defineContentPatterns() {
     std::cout << "[INFO] Defining content regex patterns..." << std::endl;
     // Group related signatures to reduce DFA count (5 DFAs total)
     // 1) Powershell family: nop, exec bypass, plus generic keyword fallback
-    content_regex_patterns.push_back("(powershell\\.exe\\s+-nop|powershell\\s+-exec\\s+bypass|powershell)");
-    content_pattern_names.push_back("powershell_family");
+    content_regex_patterns.push_back("powershell");
+    content_pattern_names.push_back("powershell");
 
     // 2) Invoke family: invoke-expression, iex( ... ), invoke-webrequest, downloadstring
     content_regex_patterns.push_back("(invoke-expression|iex\\s*\\(|invoke-webrequest|downloadstring)");
     content_pattern_names.push_back("invoke_family");
 
     // 3) Command execution family: cmd.exe /c and generic cmd
-    content_regex_patterns.push_back("(cmd(\\.exe)?\\s+/c|cmd)");
+    content_regex_patterns.push_back("cmd)");
     content_pattern_names.push_back("cmd_family");
 
     // 4) Base64 EXE marker (MZ header in base64: TVqQAAMAAAAEAAAA)
