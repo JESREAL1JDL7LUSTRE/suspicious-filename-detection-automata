@@ -58,6 +58,51 @@ void DFAModule::loadDataset(const std::string& filepath) {
     }
 }
 
+// Stage filenames from TCP tricks JSONL (trace_id used as filename)
+void DFAModule::loadFilenamesFromTCPJsonl(const std::string& filepath) {
+    dataset.clear();
+    std::vector<TCPTrace> traces = JSONParser::loadTCPDataset(filepath);
+    int malicious = 0, benign = 0;
+    for (const auto& t : traces) {
+        FilenameEntry e;
+        e.filename = t.trace_id;
+        e.technique = "tcp_tricks";
+        e.category = t.category;
+        e.detected_by = "tcp_jsonl";
+        // Treat categories containing "Malicious" as malicious
+        std::string cat = t.category; std::transform(cat.begin(), cat.end(), cat.begin(), ::tolower);
+        e.is_malicious = (cat.find("malicious") != std::string::npos);
+        if (e.is_malicious) malicious++; else benign++;
+        dataset.push_back(std::move(e));
+    }
+    metrics.filenames_tested = (int)dataset.size();
+    std::cout << "[INFO] Loading filename dataset from TCP JSONL: " << filepath << std::endl;
+    std::cout << "[SUCCESS] Loaded " << dataset.size() << " filename entries (from traces)" << std::endl;
+    std::cout << "  Malicious: " << malicious << ", Benign: " << benign << std::endl;
+}
+
+// Stage filenames from combined_with_tcp.csv (trace_id used as filename)
+void DFAModule::loadFilenamesFromCSVTraces(const std::string& filepath) {
+    dataset.clear();
+    std::vector<TCPTrace> traces = JSONParser::loadTCPDatasetCSV(filepath);
+    int malicious = 0, benign = 0;
+    for (const auto& t : traces) {
+        FilenameEntry e;
+        e.filename = t.trace_id;
+        e.technique = "csv_traces";
+        e.category = t.category;
+        e.detected_by = "tcp_csv";
+        std::string cat = t.category; std::transform(cat.begin(), cat.end(), cat.begin(), ::tolower);
+        e.is_malicious = (cat.find("malicious") != std::string::npos);
+        if (e.is_malicious) malicious++; else benign++;
+        dataset.push_back(std::move(e));
+    }
+    metrics.filenames_tested = (int)dataset.size();
+    std::cout << "[INFO] Loading filename dataset from CSV traces: " << filepath << std::endl;
+    std::cout << "[SUCCESS] Loaded " << dataset.size() << " filename entries (from CSV)" << std::endl;
+    std::cout << "  Malicious: " << malicious << ", Benign: " << benign << std::endl;
+}
+
 std::vector<std::string> DFAModule::classifyDatasetAndReturnDetected() {
     std::vector<std::string> detected;
     detected.reserve(dataset.size());
@@ -158,6 +203,76 @@ void DFAModule::definePatterns() {
                   << " ('" << regex_patterns[i] << "')" << std::endl;
     }
     std::cout << "[SUCCESS] Defined " << metrics.total_patterns << " patterns\n" << std::endl;
+}
+
+// Define content regex patterns for malicious indicators (per-character DFA)
+void DFAModule::defineContentPatterns() {
+    content_regex_patterns.clear();
+    content_pattern_names.clear();
+    std::cout << "[INFO] Defining content regex patterns..." << std::endl;
+    // Group related signatures to reduce DFA count (5 DFAs total)
+    // 1) Powershell family: nop, exec bypass, plus generic keyword fallback
+    content_regex_patterns.push_back("(powershell\\.exe\\s+-nop|powershell\\s+-exec\\s+bypass|powershell)");
+    content_pattern_names.push_back("powershell_family");
+
+    // 2) Invoke family: invoke-expression, iex( ... ), invoke-webrequest, downloadstring
+    content_regex_patterns.push_back("(invoke-expression|iex\\s*\\(|invoke-webrequest|downloadstring)");
+    content_pattern_names.push_back("invoke_family");
+
+    // 3) Command execution family: cmd.exe /c and generic cmd
+    content_regex_patterns.push_back("(cmd(\\.exe)?\\s+/c|cmd)");
+    content_pattern_names.push_back("cmd_family");
+
+    // 4) Base64 EXE marker (MZ header in base64: TVqQAAMAAAAEAAAA)
+    content_regex_patterns.push_back("TVqQAAMAAAAEAAAA");
+    content_pattern_names.push_back("mz_base64");
+
+    // 5) Auto-execution macros
+    content_regex_patterns.push_back("(autoopen\\(|document_open\\(|workbook_open\\()");
+    content_pattern_names.push_back("macro_autoexec");
+    std::cout << "[SUCCESS] Defined " << content_regex_patterns.size() << " content patterns" << std::endl;
+}
+
+void DFAModule::buildContentNFAs() {
+    std::cout << "[INFO] Converting content regex to NFAs..." << std::endl;
+    content_nfas.clear();
+    for (const auto& pattern : content_regex_patterns) {
+        try {
+            NFA nfa = RegexParser::regexToNFA(pattern);
+            content_nfas.push_back(nfa);
+            std::cout << "  Built NFA for content '" << pattern << "' - "
+                      << nfa.getStateCount() << " states" << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "[WARNING] Failed to build content NFA for pattern: " << pattern
+                      << " - " << e.what() << std::endl;
+        }
+    }
+    std::cout << "[SUCCESS] Built " << content_nfas.size() << " content NFAs" << std::endl;
+}
+
+void DFAModule::convertContentToDFAs() {
+    std::cout << "[INFO] Converting content NFAs to DFAs..." << std::endl;
+    content_dfas.clear();
+    for (size_t i = 0; i < content_nfas.size(); ++i) {
+        DFA dfa = subsetConstruction(content_nfas[i]);
+        content_dfas.push_back(dfa);
+        std::cout << "  Converted content NFA " << (i+1) << " -> DFA with "
+                  << dfa.getStateCount() << " states" << std::endl;
+    }
+    std::cout << "[SUCCESS] Built " << content_dfas.size() << " content DFAs" << std::endl;
+}
+
+void DFAModule::minimizeContentDFAs() {
+    std::cout << "[INFO] Minimizing content DFAs (Hopcroft)..." << std::endl;
+    content_minimized_dfas.clear();
+    for (size_t i = 0; i < content_dfas.size(); ++i) {
+        int steps = 0; std::vector<std::set<int>> parts;
+        DFA M = hopcroftMinimize(content_dfas[i], steps, parts);
+        content_minimized_dfas.push_back(M);
+        std::cout << "  Content DFA " << (i+1) << ": refinement steps = " << steps
+                  << ", final equivalence classes = " << parts.size() << std::endl;
+    }
+    std::cout << "[SUCCESS] Minimized content DFAs" << std::endl;
 }
 
 void DFAModule::buildNFAs() {
@@ -470,6 +585,30 @@ bool DFAModule::testFilenameWithDFA(const std::string& filename, std::string& ma
     return checkAdditionalPatterns(filename, matched_pattern);
 }
 
+// Return all matched DFA pattern indices for a filename (for multi-reason display)
+std::vector<size_t> DFAModule::testFilenameMatchesAll(const std::string& filename) {
+    std::vector<size_t> matches;
+    std::string lower = filename;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    for (size_t i = 0; i < minimized_dfas.size() && i < pattern_names.size(); i++) {
+        if (runDFA(minimized_dfas[i], lower)) {
+            matches.push_back(i);
+        }
+    }
+    // Include heuristic flags as synthetic indices after DFA patterns
+    // Map: unicode_trick -> pattern_names.size(), double_extension -> +1, whitespace_padding -> +2
+    size_t base = pattern_names.size();
+    bool unicode=false, dbl=false, ws=false;
+    for (unsigned char c : filename) { if (c > 127) { unicode=true; break; } }
+    int dot_count=0; for (char c : filename) { if (c=='.') dot_count++; }
+    if (dot_count>=2) dbl=true;
+    if (filename.find("  ") != std::string::npos) ws=true;
+    if (unicode) matches.push_back(base + 0);
+    if (dbl)     matches.push_back(base + 1);
+    if (ws)      matches.push_back(base + 2);
+    return matches;
+}
+
 // Test filename with DFA using verbose mode (for file scanning visualization)
 bool DFAModule::testFilenameWithDFAVerbose(const std::string& filename, std::string& matched_pattern) {
     // Convert to lowercase for case-insensitive matching
@@ -511,6 +650,19 @@ bool DFAModule::runDFAVerbose(const DFA& dfa, const std::string& input) {
         else ascii.push_back('_');
     }
     return dfa.accepts(ascii, true);
+}
+
+// Test content with minimized content DFAs
+bool DFAModule::testContentWithDFA(const std::string& content, std::string& matched_pattern) {
+    std::string lower = content;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    for (size_t i = 0; i < content_minimized_dfas.size() && i < content_pattern_names.size(); ++i) {
+        if (runDFA(content_minimized_dfas[i], lower)) {
+            matched_pattern = content_pattern_names[i];
+            return true;
+        }
+    }
+    return false;
 }
 
 // Additional pattern checks (for comprehensive detection)
@@ -643,7 +795,26 @@ void DFAModule::generateReport() {
                 std::string matched;
                 bool detected = testFilenameWithDFA(entry.filename, matched);
                 std::string result = detected ? "MALICIOUS" : "BENIGN";
-                std::string match_info = detected ? " (matched: " + matched + ")" : "";
+                std::string match_info;
+                if (detected) {
+                    auto all = testFilenameMatchesAll(entry.filename);
+                    std::ostringstream reasons;
+                    for (size_t r=0; r<all.size(); ++r) {
+                        size_t idxr = all[r];
+                        if (idxr < pattern_names.size()) {
+                            reasons << "[pattern " << (idxr+1) << "]";
+                        } else {
+                            size_t h = idxr - pattern_names.size();
+                            if (h==0) reasons << "[unicode_trick]";
+                            else if (h==1) reasons << "[double_extension]";
+                            else if (h==2) reasons << "[whitespace_padding]";
+                        }
+                        if (r+1<all.size()) reasons << " ";
+                    }
+                    match_info = " (matched: " + matched + ") " + reasons.str();
+                } else {
+                    match_info = "";
+                }
                 std::ostringstream id;
                 id << "File_" << std::setw(3) << std::setfill('0') << (sample_count+1);
                 std::cout << "[" << id.str() << "]  \"" << entry.filename
@@ -871,6 +1042,91 @@ size_t DFAModule::getDfaCount() const {
     return minimized_dfas.size();
 }
 
+// Export Graphviz DOT representing all grouped Content DFAs (one cluster per content pattern)
+std::string DFAModule::exportGraphvizAllContent() const {
+    std::ostringstream ss;
+    if (content_minimized_dfas.empty()) return ss.str();
+
+    for (size_t i = 0; i < content_minimized_dfas.size(); ++i) {
+        const DFA& dfa = content_minimized_dfas[i];
+        std::string cluster = "cluster_cdfa_" + std::to_string(i);
+        ss << "  subgraph " << cluster << " {\n";
+        ss << "    label=\"" << (i < content_pattern_names.size() ? content_pattern_names[i] : (std::string("content_dfa_") + std::to_string(i))) << "\";\n";
+        ss << "    color=lightgrey;\n";
+        ss << "    node [style=filled,color=white];\n";
+
+        // Nodes
+        for (const auto& s : dfa.states) {
+            std::string nodeName = "c" + std::to_string(i) + "_s" + std::to_string(s.id);
+            std::string label = s.label.empty() ? std::to_string(s.id) : s.label;
+            if (s.is_accepting) label += " (accept)";
+            ss << "    " << nodeName << " [label=\"" << escapeDotLabel(label) << "\"];\n";
+        }
+
+        // Transitions
+        for (const auto& kv : dfa.transition_table) {
+            int from = kv.first.first;
+            char symbol = kv.first.second;
+            int to = kv.second;
+            std::string fromName = "c" + std::to_string(i) + "_s" + std::to_string(from);
+            std::string toName = "c" + std::to_string(i) + "_s" + std::to_string(to);
+            std::string sym;
+            if (symbol == '\0') sym = "ε";
+            else sym = std::string(1, symbol);
+            ss << "    " << fromName << " -> " << toName << " [label=\"" << escapeDotLabel(sym) << "\"];\n";
+        }
+
+        ss << "  }\n";
+    }
+
+    return ss.str();
+}
+
+// Export a single Content DFA cluster by index
+std::string DFAModule::exportGraphvizForContent(size_t index) const {
+    std::ostringstream ss;
+    if (index >= content_minimized_dfas.size()) return ss.str();
+
+    const DFA& dfa = content_minimized_dfas[index];
+    std::string patternName = (index < content_pattern_names.size()) ? content_pattern_names[index] : (std::string("content_dfa_") + std::to_string(index));
+    std::string regexPattern = (index < content_regex_patterns.size()) ? content_regex_patterns[index] : "";
+
+    std::string cluster = "cluster_cdfa_" + std::to_string(index);
+    ss << "  subgraph " << cluster << " {\n";
+    ss << "    label=\"" << patternName << " (regex: " << regexPattern << ")\";\n";
+    ss << "    color=lightgrey;\n";
+    ss << "    node [style=filled,color=white];\n";
+
+    // Nodes
+    for (const auto& s : dfa.states) {
+        std::string nodeName = "c" + std::to_string(index) + "_s" + std::to_string(s.id);
+        std::string label = s.label.empty() ? std::to_string(s.id) : s.label;
+        if (s.is_accepting) label += " (accept)";
+        ss << "    " << nodeName << " [label=\"" << escapeDotLabel(label) << "\"];\n";
+    }
+
+    // Transitions
+    for (const auto& kv : dfa.transition_table) {
+        int from = kv.first.first;
+        char symbol = kv.first.second;
+        int to = kv.second;
+        std::string fromName = "c" + std::to_string(index) + "_s" + std::to_string(from);
+        std::string toName = "c" + std::to_string(index) + "_s" + std::to_string(to);
+        std::string sym;
+        if (symbol == '\0') sym = "ε";
+        else sym = std::string(1, symbol);
+        ss << "    " << fromName << " -> " << toName << " [label=\"" << escapeDotLabel(sym) << "\"];\n";
+    }
+
+    ss << "  }\n";
+    return ss.str();
+}
+
+// Getter: number of content minimized DFAs
+size_t DFAModule::getContentDfaCount() const {
+    return content_minimized_dfas.size();
+}
+
 void DFAModule::scanFiles(const std::vector<std::string>& filePaths) {
     // Build DFAs silently (no verbose output during initialization)
     if (minimized_dfas.empty()) {
@@ -988,6 +1244,17 @@ void DFAModule::generateScanReport(const std::vector<std::string>& filePaths,
             std::mt19937 gen(rd());
             std::shuffle(idx.begin(), idx.end(), gen);
             size_t sample_count = 0;
+            // Optional: attempt content match display by loading tricks content map
+            std::map<std::string,std::string> contentTag;
+            try {
+                // Build content DFAs if needed
+                if (content_minimized_dfas.empty()) {
+                    defineContentPatterns();
+                    buildContentNFAs();
+                    convertContentToDFAs();
+                    minimizeContentDFAs();
+                }
+            } catch (...) {}
             for (size_t t=0; t<idx.size() && sample_count<K; ++t) {
                 size_t i = idx[t];
                 std::string fileName = filePaths[i];
@@ -996,11 +1263,47 @@ void DFAModule::generateScanReport(const std::vector<std::string>& filePaths,
                     fileName = filePaths[i].substr(lastSlash + 1);
                 }
                 std::string result = detected[i] ? "MALICIOUS" : "BENIGN";
-                std::string match_info = detected[i] ? " (matched: " + matched_patterns[i] + ")" : "";
+                std::string match_info;
+                if (detected[i]) {
+                    // Build multi-reason tags: [pattern k]
+                    auto all = testFilenameMatchesAll(fileName);
+                    std::ostringstream reasons;
+                    for (size_t r=0; r<all.size(); ++r) {
+                        size_t idx = all[r];
+                        if (idx < pattern_names.size()) {
+                            reasons << "[pattern " << (idx+1) << "]";
+                        } else {
+                            // Heuristic indices
+                            size_t h = idx - pattern_names.size();
+                            if (h==0) reasons << "[unicode_trick]";
+                            else if (h==1) reasons << "[double_extension]";
+                            else if (h==2) reasons << "[whitespace_padding]";
+                        }
+                        if (r+1<all.size()) reasons << " ";
+                    }
+                    match_info = " (matched: " + matched_patterns[i] + ") " + reasons.str();
+                } else {
+                    match_info = "";
+                }
+                // If suspicious, try to find content via archive JSONL for display
+                std::string contentMatchSuffix;
+                if (detected[i]) {
+                    // Try tricks dataset lookup
+                    std::vector<TCPTrace> tricks = JSONParser::loadTCPDataset("archive/tcp_tricks.jsonl");
+                    for (const auto& ttrace : tricks) {
+                        if (ttrace.trace_id == fileName) {
+                            std::string m;
+                            if (testContentWithDFA(ttrace.content, m) && !m.empty()) {
+                                contentMatchSuffix = " [" + m + "]";
+                            }
+                            break;
+                        }
+                    }
+                }
                 std::ostringstream id;
                 id << "File_" << std::setw(3) << std::setfill('0') << (sample_count+1);
                 std::cout << "[" << id.str() << "]  \"" << fileName
-                          << "\" → " << result << match_info << std::endl;
+                          << "\" → " << result << match_info << contentMatchSuffix << std::endl;
                 sample_count++;
             }
         }
@@ -1018,8 +1321,23 @@ void DFAModule::generateScanReport(const std::vector<std::string>& filePaths,
     if (suspiciousCount > 0) {
         std::cout << "\n[SUSPICIOUS FILES DETECTED]" << std::endl;
         for (size_t i = 0; i < suspiciousFiles.size(); ++i) {
+            // Also include multi-reasons in this list
+            auto all = testFilenameMatchesAll(suspiciousFiles[i].first);
+            std::ostringstream reasons;
+            for (size_t r=0; r<all.size(); ++r) {
+                size_t idx = all[r];
+                if (idx < pattern_names.size()) {
+                    reasons << "[pattern " << (idx+1) << "]";
+                } else {
+                    size_t h = idx - pattern_names.size();
+                    if (h==0) reasons << "[unicode_trick]";
+                    else if (h==1) reasons << "[double_extension]";
+                    else if (h==2) reasons << "[whitespace_padding]";
+                }
+                if (r+1<all.size()) reasons << " ";
+            }
             std::cout << "  " << (i + 1) << ". " << suspiciousFiles[i].first 
-                      << " (" << suspiciousFiles[i].second << ")" << std::endl;
+                      << " (" << suspiciousFiles[i].second << ") " << reasons.str() << std::endl;
         }
     }
     
@@ -1209,6 +1527,120 @@ void DFAModule::exportRegularGrammarForPattern(size_t index, const std::string& 
     }
     out << " ⇒* " << pat << "\n";
     out.close();
+}
+
+// Export Type-3 grammar for content patterns
+void DFAModule::exportRegularGrammarForContentPattern(size_t index, const std::string& outPath) const {
+    if (index >= content_regex_patterns.size() || index >= content_pattern_names.size()) return;
+    std::ofstream out(outPath);
+    if (!out.is_open()) return;
+
+    const std::string& pat = content_regex_patterns[index];
+    const std::string& name = content_pattern_names[index];
+
+    out << "# Type-3 Regular Grammar for content pattern '" << pat << "' (" << name << ")\n";
+    out << "V = { S";
+    for (size_t i = 0; i < pat.size(); ++i) out << ", A" << i;
+    out << " }\n";
+    std::set<char> Sigma;
+    for (char c : pat) if (c != '\\') Sigma.insert(c);
+    out << "Σ = { ";
+    bool first=true; for (char c : Sigma){ if(!first) out<<", "; out<<c; first=false; }
+    out << " }\n";
+    out << "S = S\n";
+    out << "P:\n";
+    for (size_t i = 0; i < pat.size(); ++i) {
+        char c = pat[i];
+        std::string Ai = (i==0?"S":"A"+std::to_string(i-1));
+        std::string Aj = (i+1<pat.size()?"A"+std::to_string(i):"A"+std::to_string(i));
+        out << "  " << Ai << " → " << c << " " << Aj << "\n";
+    }
+    out << "  A" << (pat.empty()?0:pat.size()-1) << " → ε\n";
+    out << "\n# Sample derivation (literal pattern)\n";
+    out << "S ⇒ ";
+    for (size_t i = 0; i < pat.size(); ++i) { out << pat[i]; if (i+1<pat.size()) out << " A" << i; }
+    out << " ⇒* " << pat << "\n";
+    out.close();
+}
+// Simple DFA-on-contents gate using literal substring checks that mirror regex signatures.
+// This keeps content scanning efficient and demonstrable for the project scope.
+bool DFAModule::scanContent(const std::string& content) {
+    // Ensure content DFAs are built
+    if (content_minimized_dfas.empty()) {
+        defineContentPatterns();
+        buildContentNFAs();
+        convertContentToDFAs();
+        minimizeContentDFAs();
+    }
+    std::string matched;
+    return testContentWithDFA(content, matched);
+}
+
+// Dedicated output section for the Content Scan DFA module
+void DFAModule::generateContentScanReport() {
+    // Ensure content DFAs are ready
+    if (content_minimized_dfas.empty()) {
+        defineContentPatterns();
+        buildContentNFAs();
+        convertContentToDFAs();
+        minimizeContentDFAs();
+    }
+
+    std::cout << "\n";
+    std::cout << "╔═══════════════════════════════════════════════════════════╗" << std::endl;
+    std::cout << "║            CONTENT SCAN: DFA MODULE (TYPE-3)              ║" << std::endl;
+    std::cout << "╚═══════════════════════════════════════════════════════════╝" << std::endl;
+
+    std::cout << "\n[CONTENT PATTERNS]" << std::endl;
+    for (size_t i = 0; i < content_pattern_names.size(); ++i) {
+        std::cout << "  Pattern " << (i+1) << ": " << content_pattern_names[i]
+                  << " ('" << content_regex_patterns[i] << "')" << std::endl;
+    }
+
+    std::cout << "\n[CONTENT DFA SUMMARY]" << std::endl;
+    std::cout << "  DFAs built:            " << content_dfas.size() << std::endl;
+    std::cout << "  DFAs after minimization:" << content_minimized_dfas.size() << std::endl;
+
+    // Try a small randomized sample from tricks dataset to illustrate matches
+    std::vector<TCPTrace> tricks;
+    try { tricks = JSONParser::loadTCPDataset("archive/tcp_tricks.jsonl"); } catch (...) {}
+    if (!tricks.empty()) {
+        std::cout << "\n[SAMPLE CONTENT RESULTS (RANDOMIZED)]" << std::endl;
+        std::vector<size_t> idx(tricks.size()); for (size_t i=0;i<idx.size();++i) idx[i]=i;
+        std::random_device rd; std::mt19937 gen(rd()); std::shuffle(idx.begin(), idx.end(), gen);
+        size_t shown = 0; const size_t K = 5;
+        for (size_t t=0; t<idx.size() && shown<K; ++t) {
+            const auto& tr = tricks[idx[t]];
+            std::string m;
+            bool mal = testContentWithDFA(tr.content, m);
+            std::ostringstream id; id << "Content_" << std::setw(3) << std::setfill('0') << (shown+1);
+            std::cout << "[" << id.str() << "] trace_id='" << tr.trace_id << "' → "
+                      << (mal?"MALICIOUS":"BENIGN") << (mal? (" (matched: " + m + ")") : "")
+                      << std::endl;
+            shown++;
+        }
+    } else {
+        std::cout << "\n[INFO] No sample content dataset found at 'archive/tcp_tricks.jsonl'." << std::endl;
+    }
+
+    // Write a brief report file
+    try {
+        std::ofstream out("output/content_dfa_report.txt");
+        if (out.is_open()) {
+            out << "╔═══════════════════════════════════════════════════════════╗\n";
+            out << "║            CONTENT SCAN: DFA MODULE (TYPE-3)              ║\n";
+            out << "╚═══════════════════════════════════════════════════════════╝\n";
+            out << "\n[CONTENT DFA SUMMARY]\n";
+            out << "  DFAs built:            " << content_dfas.size() << "\n";
+            out << "  DFAs after minimization:" << content_minimized_dfas.size() << "\n";
+            out << "\n[CONTENT PATTERNS]\n";
+            for (size_t i = 0; i < content_pattern_names.size(); ++i) {
+                out << "  Pattern " << (i+1) << ": " << content_pattern_names[i]
+                    << " ('" << content_regex_patterns[i] << "')\n";
+            }
+            out.close();
+        }
+    } catch (...) {}
 }
 
 } // namespace CS311

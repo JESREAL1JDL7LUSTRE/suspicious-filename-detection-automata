@@ -110,10 +110,15 @@ int main(int argc, char* argv[]) {
             // NORMAL MODE: Use dataset files with structured steps
             // 1. Dataset Loading (Trick JSONL)
             std::cout << "1. Dataset Loading" << std::endl;
-            std::cout << "[INFO] Reading tricks dataset: archive/Malicious_file_trick_detection.jsonl" << std::endl;
-            dfaModule.loadDataset("archive/Malicious_file_trick_detection.jsonl");
+            std::cout << "[INFO] Reading tricks dataset: archive/tcp_tricks.jsonl" << std::endl;
+            dfaModule.loadFilenamesFromTCPJsonl("archive/tcp_tricks.jsonl");
+            int stagedAfterTricks = dfaModule.getMetrics().filenames_tested;
             std::cout << "✓ SUCCESS — Trick dataset loaded" << std::endl;
-            std::cout << "✓ SUCCESS — Total filenames staged: " << dfaModule.getMetrics().filenames_tested << std::endl;
+            std::cout << "  Filenames staged (tricks): " << stagedAfterTricks << std::endl;
+            std::cout << "[INFO] Reading CSV traces dataset: archive/combined_with_tcp.csv" << std::endl;
+            dfaModule.loadFilenamesFromCSVTraces("archive/combined_with_tcp.csv");
+            std::cout << "✓ SUCCESS — CSV dataset loaded" << std::endl;
+            std::cout << "  Filenames staged (tricks + CSV): " << dfaModule.getMetrics().filenames_tested << std::endl;
             std::cout << std::endl;
 
             // 2. Regex Pattern Definition
@@ -142,12 +147,35 @@ int main(int argc, char* argv[]) {
                     std::cout << "[OK] Wrote Regular Grammar: " << path << std::endl;
                 }
 
+            // CONTENT DFA: Build and minimize, export grammars
+            dfaModule.defineContentPatterns();
+            dfaModule.buildContentNFAs();
+            dfaModule.convertContentToDFAs();
+            dfaModule.minimizeContentDFAs();
+            for (size_t i = 0; i < dfaModule.getContentDfaCount(); ++i) {
+                std::string path = "output/grammar_content_" + std::to_string(i) + ".txt";
+                dfaModule.exportRegularGrammarForContentPattern(i, path);
+                std::cout << "[OK] Wrote Content Regular Grammar: " << path << std::endl;
+            }
+
+            // MODULE 2 — Content Scan (DFA)
+            std::cout << "\n╔═══════════════════════════════════╗" << std::endl;
+            std::cout << "MODULE 2 — Content Scan (DFA)" << std::endl;
+            std::cout << "╚═══════════════════════════════════╝" << std::endl;
+            std::cout << "Chomsky Type-3: Regular Language" << std::endl;
+            std::cout << "\nUses Deterministic Finite Automaton (DFA)" << std::endl;
+            std::cout << "• Memory: finite-state" << std::endl;
+            std::cout << "• Function: content inspection" << std::endl;
+            std::cout << std::endl;
+            // CONTENT SCAN MODULE OUTPUT (dedicated section)
+            dfaModule.generateContentScanReport();
+
             // 6. Sample Filename Detection (Randomized)
             std::cout << "6. Sample Filename Detection (Randomized)" << std::endl;
             dfaModule.testPatterns();
 
-            // 6b. DFA→PDA: Classify dataset and collect suspicious filenames (TRICKS)
-            std::cout << "6b. DFA Classification → Collect suspicious filenames" << std::endl;
+            // 6b. DFA→PDA: Classify dataset and collect suspicious filenames (TRICKS + CSV staged together)
+            std::cout << "6b. DFA Classification → Collect suspicious filenames (all staged)" << std::endl;
             suspiciousGlobal = dfaModule.classifyDatasetAndReturnDetected();
             std::cout << "  [INFO] DFA flagged " << suspiciousGlobal.size() << " entries as suspicious" << std::endl;
 
@@ -179,9 +207,9 @@ int main(int argc, char* argv[]) {
         return 0;
     }
     
-    // MODULE 2 header (box style)
+    // MODULE 3 header (box style)
     std::cout << "\n╔═══════════════════════════════════╗" << std::endl;
-    std::cout << "MODULE 2 — TCP Protocol Validation (PDA)" << std::endl;
+    std::cout << "MODULE 3 — TCP Protocol Validation (PDA)" << std::endl;
     std::cout << "╚═══════════════════════════════════╝" << std::endl;
     std::cout << "Chomsky Type-2: Context-Free Language" << std::endl;
     std::cout << "\nUses Pushdown Automaton (PDA)" << std::endl;
@@ -191,21 +219,42 @@ int main(int argc, char* argv[]) {
     
     PDAModule pdaModule;
     try {
-        // 1. Loading TCP Trace Dataset for TRICKS (augmented)
+        // 1. Loading TCP Trace Dataset (TRICKS) then gating by DFA filename + content DFA
         std::cout << "1. Loading TCP Trace Dataset" << std::endl;
         std::cout << "[INFO] Reading: archive/tcp_tricks.jsonl" << std::endl;
         pdaModule.loadDataset("archive/tcp_tricks.jsonl");
-        // Filter to DFA hits (trace_id equals filename)
-        {
-            std::set<std::string> suspiciousSet(suspiciousGlobal.begin(), suspiciousGlobal.end());
-            pdaModule.filterDatasetByTraceIds(suspiciousSet);
+
+        // Compute intersection: suspicious filenames (DFA) ∩ content-malicious (DFA)
+        std::set<std::string> suspiciousSet(suspiciousGlobal.begin(), suspiciousGlobal.end());
+        std::vector<TCPTrace> tricks = JSONParser::loadTCPDataset("archive/tcp_tricks.jsonl");
+        std::set<std::string> contentMalicious;
+        for (const auto& t : tricks) {
+            if (suspiciousSet.count(t.trace_id) == 0) continue; // filename must be suspicious first
+            if (dfaModule.scanContent(t.content)) {
+                contentMalicious.insert(t.trace_id);
+            }
         }
+
+        // Pipeline summary before gating
+        std::cout << "[PIPELINE] DFA filename suspicious: " << suspiciousSet.size()
+                  << ", Content-malicious (within suspicious): " << contentMalicious.size() << std::endl;
+
+        // If nothing to validate, skip PDA module entirely
+        if (contentMalicious.empty()) {
+            std::cout << "[INFO] No traces meet gating (filename suspicious AND content malicious). Skipping PDA." << std::endl;
+            // Still export DOT/JSON for DFA modules below
+            goto DOT_EXPORTS;
+        }
+
+        // Apply gating to PDA dataset
+        pdaModule.filterDatasetByTraceIds(contentMalicious);
+
         if (strictHandshake) {
             std::cout << "[INFO] Strict handshake-only CFG enabled" << std::endl;
             pdaModule.setStrictHandshake(true);
         }
         const auto& pdaM1 = pdaModule.getMetrics();
-        std::cout << "✓ SUCCESS — Loaded " << pdaM1.total_traces << " traces" << std::endl;
+        std::cout << "✓ SUCCESS — Loaded " << pdaM1.total_traces << " gated traces" << std::endl;
         std::cout << "Valid:   " << pdaM1.valid_traces << std::endl;
         std::cout << "Invalid: " << pdaM1.invalid_traces << std::endl;
         std::cout << std::endl;
@@ -237,45 +286,12 @@ int main(int argc, char* argv[]) {
         std::cout << "6. PDA Summary" << std::endl;
         pdaModule.generateReport();
 
-        // =============================
-        // SECOND RUN — CSV DATASETS
-        // =============================
-        std::cout << "\n\n";
-        std::cout << "╔═══════════════════════════════════════════════════════════╗" << std::endl;
-        std::cout << "║        RE-RUN — CSV (combined_random + malware)           ║" << std::endl;
-        std::cout << "╚═══════════════════════════════════════════════════════════╝" << std::endl;
-
-        // Reload DFA dataset from CSVs (synthesized filenames)
-        dfaModule.clearDataset();
-        dfaModule.integrateCombinedAndMalwareCSVs("archive/combined_random.csv", "archive/malware.csv");
-        std::cout << "\n[INFO] Classifying CSV dataset with existing DFA..." << std::endl;
-        std::vector<std::string> suspiciousCSV = dfaModule.classifyDatasetAndReturnDetected();
-        std::cout << "  [INFO] DFA flagged " << suspiciousCSV.size() << " CSV entries as suspicious" << std::endl;
-        // Suppress rebuild metrics in CSV rerun: keep only classification summary above
-
-        // Reload PDA dataset for CSV TCP traces and filter to DFA hits
-        std::cout << "\n[INFO] Loading CSV TCP traces: archive/combined_with_tcp.csv" << std::endl;
-        pdaModule.loadDataset("archive/combined_with_tcp.csv");
-        {
-            std::set<std::string> suspiciousSetCSV(suspiciousCSV.begin(), suspiciousCSV.end());
-            pdaModule.filterDatasetByTraceIds(suspiciousSetCSV);
-        }
-        if (strictHandshake) {
-            std::cout << "[INFO] Strict handshake-only CFG enabled" << std::endl;
-            pdaModule.setStrictHandshake(true);
-        }
-        const auto& pdaMcsv = pdaModule.getMetrics();
-        std::cout << "✓ SUCCESS — Loaded " << pdaMcsv.total_traces << " traces" << std::endl;
-        std::cout << "Valid:   " << pdaMcsv.valid_traces << std::endl;
-        std::cout << "Invalid: " << pdaMcsv.invalid_traces << std::endl;
-
-        // PDA structure remains the same; just re-run validation on CSV traces
-        pdaModule.testAllTraces();
-        // Example stack traces already shown earlier
+        // (CSV rerun removed — both datasets are staged and used from the start)
     } catch (const std::exception& e) {
         std::cerr << "[ERROR] PDA Module failed: " << e.what() << std::endl;
     }
 
+DOT_EXPORTS:
     // After modules have been built and reports generated, write separate DOT files
     try {
         // Write one DOT file per minimized DFA with proper naming
@@ -312,6 +328,32 @@ int main(int argc, char* argv[]) {
                 std::cout << "[OK] Wrote minimized DFA DOT: " << path << " (pattern: " << patternName << ")" << std::endl;
             } else {
                 std::cerr << "[WARN] Could not open " << path << std::endl;
+            }
+        }
+
+        // Write content DFAs DOT and JSON similarly
+        {
+            size_t cdfaCount = dfaModule.getContentDfaCount();
+            const auto& cPatternNames = dfaModule.getContentPatternNames();
+            const auto& cRegexPatterns = dfaModule.getContentRegexPatterns();
+            for (size_t i = 0; i < cdfaCount; ++i) {
+                std::ostringstream dot;
+                std::string patternName = (i < cPatternNames.size()) ? cPatternNames[i] : ("content_pattern_" + std::to_string(i));
+                std::string regexPattern = (i < cRegexPatterns.size()) ? cRegexPatterns[i] : "";
+                dot << "// Minimized Content DFA for pattern: " << patternName << "\n";
+                dot << "// Regex: " << regexPattern << "\n";
+                dot << "// Alphabet: Printable ASCII (32-126) - per-character tokenization\n";
+                dot << "digraph G {\n";
+                dot << "  rankdir=LR;\n";
+                dot << "  label=\"Content DFA for " << patternName << " (regex: " << regexPattern << ")\";\n";
+                dot << dfaModule.exportGraphvizForContent(i) << "\n";
+                dot << "  start [shape=Mdiamond];\n";
+                dot << "  end [shape=Msquare];\n";
+                dot << "  start -> c" << i << "_s0;\n";
+                dot << "}\n";
+                std::string path = "output/dfa_content_min_" + std::to_string(i) + ".dot";
+                std::ofstream out(path);
+                if (out.is_open()) { out << dot.str(); out.close(); std::cout << "[OK] Wrote content DFA DOT: " << path << std::endl; }
             }
         }
 
@@ -427,6 +469,13 @@ int main(int argc, char* argv[]) {
         size_t dfaCount = dfaModule.getDfaCount();
         for (size_t i = 0; i < dfaCount; ++i) {
             parseGraphvizToJson(dfaModule.exportGraphvizFor(i), "DFA", "output/dfa_min_" + std::to_string(i) + ".json");
+        }
+        // Content DFA JSONs
+        {
+            size_t cdfaCount = dfaModule.getContentDfaCount();
+            for (size_t i = 0; i < cdfaCount; ++i) {
+                parseGraphvizToJson(dfaModule.exportGraphvizForContent(i), "DFA_CONTENT", "output/dfa_content_min_" + std::to_string(i) + ".json");
+            }
         }
         // PDA JSON
         parseGraphvizToJson(pdaModule.exportGraphviz(), "PDA", "output/pda.json");

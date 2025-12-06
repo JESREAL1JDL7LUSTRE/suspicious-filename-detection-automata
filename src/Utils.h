@@ -168,6 +168,8 @@ struct TCPTrace {
     bool valid;
     std::string description;
     std::string category;
+    // NEW: synthetic or real content associated with the filename for DFA-on-contents
+    std::string content;
     TCPTrace() : valid(false) {}
 };
 
