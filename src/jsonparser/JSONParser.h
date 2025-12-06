@@ -26,7 +26,7 @@ public:
     // Load datasets from JSONL files
     static std::vector<FilenameEntry> loadFilenameDataset(const std::string& filepath);
     static std::vector<TCPTrace> loadTCPDataset(const std::string& filepath);
-    // Load TCP traces from CSV (trace_id,sequence,valid,description,category)
+    // Load TCP traces from CSV (trace_id,sequence,valid,description,category[,content])
     static std::vector<TCPTrace> loadTCPDatasetCSV(const std::string& filepath);
 };
 
