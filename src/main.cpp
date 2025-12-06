@@ -34,6 +34,8 @@ int main(int argc, char* argv[]) {
     bool dfaVerbose = false;
     bool strictHandshake = false;
     std::vector<std::string> filePaths;
+    // Carry DFA-suspicious filenames across to PDA
+    std::vector<std::string> suspiciousGlobal;
     // Parse arguments: files imply scanMode; flag --dfa-verbose enables verbose DFA
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -71,6 +73,8 @@ int main(int argc, char* argv[]) {
     std::cout << std::endl;
     
     DFAModule dfaModule;
+    // Use multiple DFAs (one per pattern) for true substring matching
+    dfaModule.setCombineAllPatterns(false);
     try {
         // Ensure output directory exists
         std::filesystem::create_directories("output");
@@ -104,13 +108,11 @@ int main(int argc, char* argv[]) {
             }
         } else {
             // NORMAL MODE: Use dataset files with structured steps
-            // 1. Dataset Loading
+            // 1. Dataset Loading (Trick JSONL)
             std::cout << "1. Dataset Loading" << std::endl;
-            std::cout << "[INFO] Reading filename dataset: archive/Malicious_file_trick_detection.jsonl" << std::endl;
+            std::cout << "[INFO] Reading tricks dataset: archive/Malicious_file_trick_detection.jsonl" << std::endl;
             dfaModule.loadDataset("archive/Malicious_file_trick_detection.jsonl");
-            std::cout << "[INFO] Integrating CSVs: archive/combined_random.csv (type-labeled) + archive/malware.csv" << std::endl;
-            dfaModule.integrateCombinedAndMalwareCSVs("archive/combined_random.csv", "archive/malware.csv");
-            std::cout << "✓ SUCCESS — Evaluation sources: JSONL + combined_random + malware (no benign.csv)" << std::endl;
+            std::cout << "✓ SUCCESS — Trick dataset loaded" << std::endl;
             std::cout << "✓ SUCCESS — Total filenames staged: " << dfaModule.getMetrics().filenames_tested << std::endl;
             std::cout << std::endl;
 
@@ -133,13 +135,7 @@ int main(int argc, char* argv[]) {
             // 5. DFA Minimization (Hopcroft)
             std::cout << "5. DFA Minimization (Hopcroft)" << std::endl;
             dfaModule.minimizeDFAs();        
-                // Export regular grammars for each pattern
-                for (size_t i = 0; i < dfaModule.getDfaCount(); ++i) {
-                    std::string path = "output/grammar_" + std::to_string(i) + ".txt";
-                    dfaModule.exportRegularGrammarForPattern(i, path);
-                    std::cout << "[OK] Wrote Regular Grammar: " << path << std::endl;
-                }
-                // Export regular grammars for each pattern
+                // Export regular grammars for each pattern (write once)
                 for (size_t i = 0; i < dfaModule.getDfaCount(); ++i) {
                     std::string path = "output/grammar_" + std::to_string(i) + ".txt";
                     dfaModule.exportRegularGrammarForPattern(i, path);
@@ -149,6 +145,11 @@ int main(int argc, char* argv[]) {
             // 6. Sample Filename Detection (Randomized)
             std::cout << "6. Sample Filename Detection (Randomized)" << std::endl;
             dfaModule.testPatterns();
+
+            // 6b. DFA→PDA: Classify dataset and collect suspicious filenames (TRICKS)
+            std::cout << "6b. DFA Classification → Collect suspicious filenames" << std::endl;
+            suspiciousGlobal = dfaModule.classifyDatasetAndReturnDetected();
+            std::cout << "  [INFO] DFA flagged " << suspiciousGlobal.size() << " entries as suspicious" << std::endl;
 
             // 7. DFA Summary
             std::cout << "7. DFA Summary" << std::endl;
@@ -190,10 +191,15 @@ int main(int argc, char* argv[]) {
     
     PDAModule pdaModule;
     try {
-        // 1. Loading TCP Trace Dataset
+        // 1. Loading TCP Trace Dataset for TRICKS (augmented)
         std::cout << "1. Loading TCP Trace Dataset" << std::endl;
-        std::cout << "[INFO] Reading: archive/tcp_handshake_traces_expanded.jsonl" << std::endl;
-        pdaModule.loadDataset("archive/tcp_handshake_traces_expanded.jsonl");
+        std::cout << "[INFO] Reading: archive/tcp_tricks.jsonl" << std::endl;
+        pdaModule.loadDataset("archive/tcp_tricks.jsonl");
+        // Filter to DFA hits (trace_id equals filename)
+        {
+            std::set<std::string> suspiciousSet(suspiciousGlobal.begin(), suspiciousGlobal.end());
+            pdaModule.filterDatasetByTraceIds(suspiciousSet);
+        }
         if (strictHandshake) {
             std::cout << "[INFO] Strict handshake-only CFG enabled" << std::endl;
             pdaModule.setStrictHandshake(true);
@@ -230,6 +236,42 @@ int main(int argc, char* argv[]) {
         // 6. PDA Summary
         std::cout << "6. PDA Summary" << std::endl;
         pdaModule.generateReport();
+
+        // =============================
+        // SECOND RUN — CSV DATASETS
+        // =============================
+        std::cout << "\n\n";
+        std::cout << "╔═══════════════════════════════════════════════════════════╗" << std::endl;
+        std::cout << "║        RE-RUN — CSV (combined_random + malware)           ║" << std::endl;
+        std::cout << "╚═══════════════════════════════════════════════════════════╝" << std::endl;
+
+        // Reload DFA dataset from CSVs (synthesized filenames)
+        dfaModule.clearDataset();
+        dfaModule.integrateCombinedAndMalwareCSVs("archive/combined_random.csv", "archive/malware.csv");
+        std::cout << "\n[INFO] Classifying CSV dataset with existing DFA..." << std::endl;
+        std::vector<std::string> suspiciousCSV = dfaModule.classifyDatasetAndReturnDetected();
+        std::cout << "  [INFO] DFA flagged " << suspiciousCSV.size() << " CSV entries as suspicious" << std::endl;
+        // Suppress rebuild metrics in CSV rerun: keep only classification summary above
+
+        // Reload PDA dataset for CSV TCP traces and filter to DFA hits
+        std::cout << "\n[INFO] Loading CSV TCP traces: archive/combined_with_tcp.csv" << std::endl;
+        pdaModule.loadDataset("archive/combined_with_tcp.csv");
+        {
+            std::set<std::string> suspiciousSetCSV(suspiciousCSV.begin(), suspiciousCSV.end());
+            pdaModule.filterDatasetByTraceIds(suspiciousSetCSV);
+        }
+        if (strictHandshake) {
+            std::cout << "[INFO] Strict handshake-only CFG enabled" << std::endl;
+            pdaModule.setStrictHandshake(true);
+        }
+        const auto& pdaMcsv = pdaModule.getMetrics();
+        std::cout << "✓ SUCCESS — Loaded " << pdaMcsv.total_traces << " traces" << std::endl;
+        std::cout << "Valid:   " << pdaMcsv.valid_traces << std::endl;
+        std::cout << "Invalid: " << pdaMcsv.invalid_traces << std::endl;
+
+        // PDA structure remains the same; just re-run validation on CSV traces
+        pdaModule.testAllTraces();
+        // Example stack traces already shown earlier
     } catch (const std::exception& e) {
         std::cerr << "[ERROR] PDA Module failed: " << e.what() << std::endl;
     }

@@ -2,6 +2,8 @@
 #include "JSONParser.h"
 #include <set>
 #include <algorithm>
+#include <sstream>
+#include <cctype>
 
 namespace CS311 {
 
@@ -173,6 +175,57 @@ std::vector<TCPTrace> JSONParser::loadTCPDataset(const std::string& filepath) {
     int valid_count = 0;
     for (const auto& t : dataset) if (t.valid) valid_count++;
     std::cout << "[SUCCESS] Loaded " << dataset.size() << " TCP traces" << std::endl;
+    std::cout << "  Valid sequences: " << valid_count << std::endl;
+    std::cout << "  Invalid sequences: " << (dataset.size() - valid_count) << std::endl;
+    return dataset;
+}
+
+std::vector<TCPTrace> JSONParser::loadTCPDatasetCSV(const std::string& filepath) {
+    std::vector<TCPTrace> dataset;
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        std::cerr << "[ERROR] Could not open file: " << filepath << std::endl;
+        return dataset;
+    }
+    std::cout << "[INFO] Loading TCP trace dataset (CSV): " << filepath << std::endl;
+    std::string line;
+    // Read header
+    if (!std::getline(file, line)) {
+        file.close();
+        return dataset;
+    }
+    // Expected header: trace_id,sequence,valid,description,category
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        std::istringstream ss(line);
+        std::string trace_id, sequence, valid, description, category;
+        if (!std::getline(ss, trace_id, ',')) continue;
+        if (!std::getline(ss, sequence, ',')) continue;
+        if (!std::getline(ss, valid, ',')) valid = "false";
+        if (!std::getline(ss, description, ',')) description = "";
+        if (!std::getline(ss, category, ',')) category = "";
+        // Parse sequence: pipe-delimited tokens
+        TCPTrace t;
+        t.trace_id = trace_id;
+        size_t start = 0;
+        while (start <= sequence.size()) {
+            size_t sep = sequence.find('|', start);
+            std::string token = sequence.substr(start, sep == std::string::npos ? std::string::npos : sep - start);
+            if (!token.empty()) t.sequence.push_back(token);
+            if (sep == std::string::npos) break;
+            start = sep + 1;
+        }
+        // valid flag
+        std::string v = valid;
+        std::transform(v.begin(), v.end(), v.begin(), ::tolower);
+        t.valid = (v == "true" || v == "1");
+        t.description = description;
+        t.category = category;
+        dataset.push_back(std::move(t));
+    }
+    file.close();
+    int valid_count = 0; for (const auto& t : dataset) if (t.valid) valid_count++;
+    std::cout << "[SUCCESS] Loaded " << dataset.size() << " TCP traces (CSV)" << std::endl;
     std::cout << "  Valid sequences: " << valid_count << std::endl;
     std::cout << "  Invalid sequences: " << (dataset.size() - valid_count) << std::endl;
     return dataset;

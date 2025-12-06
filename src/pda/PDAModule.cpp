@@ -18,12 +18,59 @@ namespace CS311 {
 PDAModule::PDAModule() {}
 
 void PDAModule::loadDataset(const std::string& filepath) {
-    dataset = JSONParser::loadTCPDataset(filepath);
+    // Load JSONL or CSV depending on extension
+    auto endsWith = [](const std::string& s, const std::string& suf){
+        if (s.size() < suf.size()) return false;
+        return std::equal(s.end()-suf.size(), s.end(), suf.begin(), suf.end(), [](char a,char b){return std::tolower(a)==std::tolower(b);});
+    };
+    if (endsWith(filepath, ".csv")) {
+        dataset = JSONParser::loadTCPDatasetCSV(filepath);
+    } else {
+        dataset = JSONParser::loadTCPDataset(filepath);
+    }
     metrics.total_traces = (int)dataset.size();
     for (const auto& t : dataset) {
         if (t.valid) metrics.valid_traces++;
         else metrics.invalid_traces++;
     }
+}
+
+void PDAModule::synthesizeTracesForFilenames(const std::vector<std::string>& filenames, bool valid) {
+    dataset.clear();
+    metrics = PDAMetrics{};
+    // Basic pools
+    const std::vector<std::vector<std::string>> VALID_SEQS = {
+        {"SYN","SYN-ACK","ACK"},
+        {"SYN","SYN-ACK","ACK","DATA","ACK"},
+        {"SYN","SYN-ACK","ACK","FIN","ACK"}
+    };
+    const std::vector<std::vector<std::string>> INVALID_SEQS = {
+        {"SYN"}, {"SYN","ACK"}, {"ACK"}, {"RST"}
+    };
+    std::mt19937 gen(311);
+    std::uniform_int_distribution<size_t> dv(0, VALID_SEQS.size()-1);
+    std::uniform_int_distribution<size_t> di(0, INVALID_SEQS.size()-1);
+
+    dataset.reserve(filenames.size());
+    for (const auto& fn : filenames) {
+        TCPTrace t;
+        t.trace_id = fn;
+        if (valid) {
+            t.sequence = VALID_SEQS[dv(gen)];
+            t.valid = true;
+            t.description = "Synthetic valid handshake for benign filename";
+            t.category = "Derived Benign";
+        } else {
+            t.sequence = INVALID_SEQS[di(gen)];
+            t.valid = false;
+            t.description = "Synthetic invalid handshake for malicious filename";
+            t.category = "Derived Malicious";
+        }
+        dataset.push_back(std::move(t));
+    }
+    metrics.total_traces = (int)dataset.size();
+    metrics.valid_traces = valid ? (int)dataset.size() : 0;
+    metrics.invalid_traces = valid ? 0 : (int)dataset.size();
 }
 
 void PDAModule::defineCFG() {
@@ -258,6 +305,17 @@ void PDAModule::testAllTraces() {
     
     auto start = std::chrono::high_resolution_clock::now();
     
+    // Reset run-specific metrics to avoid accumulation across passes
+    metrics.correctly_accepted = 0;
+    metrics.correctly_rejected = 0;
+    metrics.false_positives = 0;
+    metrics.false_negatives = 0;
+    metrics.max_stack_depth = 0;
+    metrics.avg_stack_depth = 0.0;
+    metrics.avg_validation_time_ms = 0.0;
+    metrics.total_execution_time_ms = 0.0;
+    metrics.validation_accuracy = 0.0;
+
     int total_depth = 0;
     std::vector<std::string> failed_traces;
     
@@ -298,6 +356,7 @@ void PDAModule::testAllTraces() {
     metrics.validation_accuracy = 
         ((double)(metrics.correctly_accepted + metrics.correctly_rejected) / 
          (dataset.size() > 0 ? dataset.size() : 1)) * 100.0;
+    if (metrics.validation_accuracy > 100.0) metrics.validation_accuracy = 100.0;
     
     std::cout << "[SUCCESS] Validation complete" << std::endl;
     std::cout << "  Accuracy: " << metrics.validation_accuracy << "%" << std::endl;
@@ -310,6 +369,24 @@ void PDAModule::testAllTraces() {
         }
     }
     std::cout << std::endl;
+}
+
+void PDAModule::filterDatasetByTraceIds(const std::set<std::string>& ids) {
+    if (ids.empty()) return;
+    std::vector<TCPTrace> filtered;
+    filtered.reserve(dataset.size());
+    for (const auto& t : dataset) {
+        if (ids.count(t.trace_id) > 0) {
+            filtered.push_back(t);
+        }
+    }
+    dataset.swap(filtered);
+    metrics.total_traces = (int)dataset.size();
+    metrics.valid_traces = 0;
+    metrics.invalid_traces = 0;
+    for (const auto& t : dataset) {
+        if (t.valid) metrics.valid_traces++; else metrics.invalid_traces++;
+    }
 }
 
 void PDAModule::showStackOperations(const std::vector<std::string>& sequence) {
