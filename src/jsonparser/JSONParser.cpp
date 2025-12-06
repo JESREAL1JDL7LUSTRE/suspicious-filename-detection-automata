@@ -92,6 +92,7 @@ TCPTrace JSONParser::parseTCPTraceSimple(const std::string& line) {
     }
     trace.description = extractString(line, "description");
     trace.category = extractString(line, "category");
+    trace.content = extractString(line, "content");
     return trace;
 }
 
@@ -194,16 +195,22 @@ std::vector<TCPTrace> JSONParser::loadTCPDatasetCSV(const std::string& filepath)
         file.close();
         return dataset;
     }
-    // Expected header: trace_id,sequence,valid,description,category
+    // Expected header: trace_id,sequence,valid,description,category[,content]
     while (std::getline(file, line)) {
         if (line.empty()) continue;
         std::istringstream ss(line);
-        std::string trace_id, sequence, valid, description, category;
+        std::string trace_id, sequence, valid, description, category, content;
         if (!std::getline(ss, trace_id, ',')) continue;
         if (!std::getline(ss, sequence, ',')) continue;
         if (!std::getline(ss, valid, ',')) valid = "false";
         if (!std::getline(ss, description, ',')) description = "";
         if (!std::getline(ss, category, ',')) category = "";
+        // Optional content column
+        if (std::getline(ss, content, ',')) {
+            // content may include commas originally; dataset keeps it simple
+        } else {
+            content = "";
+        }
         // Parse sequence: pipe-delimited tokens
         TCPTrace t;
         t.trace_id = trace_id;
@@ -221,6 +228,7 @@ std::vector<TCPTrace> JSONParser::loadTCPDatasetCSV(const std::string& filepath)
         t.valid = (v == "true" || v == "1");
         t.description = description;
         t.category = category;
+        t.content = content;
         dataset.push_back(std::move(t));
     }
     file.close();

