@@ -3,6 +3,7 @@
  * Main Program - Now follows the architecture properly
  */
 #include <iostream>
+#include <cstdio>
 #ifdef _WIN32
 #include <windows.h>
 #endif
@@ -25,6 +26,13 @@ int main(int argc, char* argv[]) {
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
 #endif
+
+    // CRITICAL FIX: Disable C++ buffering for stdout/stderr
+    // When stdout is piped (like to Node.js), C++ defaults to full buffering
+    // This prevents frontend from seeing real-time state transitions
+    std::cout.setf(std::ios::unitbuf);  // Enable unit buffering (flush after every output)
+    std::cerr.setf(std::ios::unitbuf);
+    std::setvbuf(stdout, nullptr, _IONBF, 0);  // Also tell C stdio to use no buffering
 
     // Create module instances and ensure output directory exists
     std::filesystem::create_directories("output");
@@ -420,13 +428,29 @@ DOT_EXPORTS:
         auto parseGraphvizToJson = [&](const std::string& gv, const std::string& type, const std::string& outPath){
             std::vector<NodeOut> nodes;
             std::vector<EdgeOut> edges;
-            std::vector<std::string> accept; // TODO: populate from modules when available
+            std::vector<std::string> accept;
             std::string start;
+            std::set<std::string> acceptSet;
 
             std::istringstream iss(gv);
             std::string line;
             while (std::getline(iss, line)) {
                 if (line.empty()) continue;
+                
+                // Parse accepting states: look for nodes marked with double circle or shape=doublecircle
+                // Example: "Q_ACCEPT [shape=doublecircle]" or entries in node attributes
+                size_t shapePos = line.find("shape=doublecircle");
+                if (shapePos != std::string::npos) {
+                    // Extract node id before the shape attribute
+                    size_t bracketPos = line.find('[');
+                    if (bracketPos != std::string::npos) {
+                        std::string nodeId = trim(line.substr(0, bracketPos));
+                        if (!nodeId.empty() && nodeId.find("->") == std::string::npos) {
+                            acceptSet.insert(nodeId);
+                        }
+                    }
+                }
+                
                 auto arrowPos = line.find("->");
                 if (arrowPos != std::string::npos) {
                     std::string left = trim(line.substr(0, arrowPos));
@@ -460,6 +484,11 @@ DOT_EXPORTS:
 
             start = nodes.empty()? std::string("S0") : nodes.front().id;
             for (const auto& n : nodes) { if (n.id.find("_s0")!=std::string::npos) { start = n.id; break; } }
+
+            // Convert acceptSet to vector
+            for (const auto& a : acceptSet) {
+                accept.push_back(a);
+            }
 
             bool ok = writeAutomataJson(type, start, accept, nodes, edges, outPath);
             if (ok) std::cout << "[OK] Wrote " << outPath << std::endl; else std::cerr << "[WARN] Could not write " << outPath << std::endl;

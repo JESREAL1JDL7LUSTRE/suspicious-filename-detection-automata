@@ -615,8 +615,16 @@ bool DFAModule::testFilenameWithDFAVerbose(const std::string& filename, std::str
     std::string lower = filename;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
     
+    // Output verbose state transitions for EVERY DFA to enable visualization
+    // This ensures the frontend sees state transitions even for non-matching files
+    std::cout << "  → Testing DFA patterns for: " << filename << std::endl;
+    std::cout.flush();
+    
     // Test against all DFAs with verbose state transitions
     for (size_t i = 0; i < minimized_dfas.size() && i < pattern_names.size(); i++) {
+        std::cout << "  [Pattern " << (i+1) << "] " << pattern_names[i] << ": " << std::endl;
+        std::cout.flush();
+        
         if (runDFAVerbose(minimized_dfas[i], lower)) {
             matched_pattern = pattern_names[i];
             return true;
@@ -974,9 +982,13 @@ std::string DFAModule::exportGraphvizAll() const {
         // Nodes
         for (const auto& s : dfa.states) {
             std::string nodeName = "d" + std::to_string(i) + "_s" + std::to_string(s.id);
-                std::string label = s.label.empty() ? std::to_string(s.id) : s.label;
-                if (s.is_accepting) label += " (accept)";
+            std::string label = s.label.empty() ? std::to_string(s.id) : s.label;
+            if (s.is_accepting) {
+                label += " (accept)";
+                ss << "    " << nodeName << " [label=\"" << escapeDotLabel(label) << "\", shape=doublecircle];\n";
+            } else {
                 ss << "    " << nodeName << " [label=\"" << escapeDotLabel(label) << "\"];\n";
+            }
         }
 
         // Transitions
@@ -1017,8 +1029,12 @@ std::string DFAModule::exportGraphvizFor(size_t index) const {
     for (const auto& s : dfa.states) {
         std::string nodeName = "d" + std::to_string(index) + "_s" + std::to_string(s.id);
         std::string label = s.label.empty() ? std::to_string(s.id) : s.label;
-        if (s.is_accepting) label += " (accept)";
-        ss << "    " << nodeName << " [label=\"" << escapeDotLabel(label) << "\"];\n";
+        if (s.is_accepting) {
+            label += " (accept)";
+            ss << "    " << nodeName << " [label=\"" << escapeDotLabel(label) << "\", shape=doublecircle];\n";
+        } else {
+            ss << "    " << nodeName << " [label=\"" << escapeDotLabel(label) << "\"];\n";
+        }
     }
 
     // Transitions
@@ -1059,8 +1075,12 @@ std::string DFAModule::exportGraphvizAllContent() const {
         for (const auto& s : dfa.states) {
             std::string nodeName = "c" + std::to_string(i) + "_s" + std::to_string(s.id);
             std::string label = s.label.empty() ? std::to_string(s.id) : s.label;
-            if (s.is_accepting) label += " (accept)";
-            ss << "    " << nodeName << " [label=\"" << escapeDotLabel(label) << "\"];\n";
+            if (s.is_accepting) {
+                label += " (accept)";
+                ss << "    " << nodeName << " [label=\"" << escapeDotLabel(label) << "\", shape=doublecircle];\n";
+            } else {
+                ss << "    " << nodeName << " [label=\"" << escapeDotLabel(label) << "\"];\n";
+            }
         }
 
         // Transitions
@@ -1101,8 +1121,12 @@ std::string DFAModule::exportGraphvizForContent(size_t index) const {
     for (const auto& s : dfa.states) {
         std::string nodeName = "c" + std::to_string(index) + "_s" + std::to_string(s.id);
         std::string label = s.label.empty() ? std::to_string(s.id) : s.label;
-        if (s.is_accepting) label += " (accept)";
-        ss << "    " << nodeName << " [label=\"" << escapeDotLabel(label) << "\"];\n";
+        if (s.is_accepting) {
+            label += " (accept)";
+            ss << "    " << nodeName << " [label=\"" << escapeDotLabel(label) << "\", shape=doublecircle];\n";
+        } else {
+            ss << "    " << nodeName << " [label=\"" << escapeDotLabel(label) << "\"];\n";
+        }
     }
 
     // Transitions

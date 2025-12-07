@@ -72,3 +72,5 @@
 {"trace_id": "T072", "sequence": ["DATA"], "valid": false, "description": "Data without handshake", "category": "Unexpected Packet"}
 {"trace_id": "T073", "sequence": ["SYN", "SYN-ACK", "ACK", "SYN"], "valid": false, "description": "New SYN after complete handshake", "category": "Unexpected Packet"}
 {"trace_id": "T074", "sequence": ["SYN", "SYN", "SYN-ACK", "ACK"], "valid": false, "description": "SYN retransmission before response", "category": "Retransmission"}
+{"trace_id": "T075", "sequence": ["SYN", "SYN-ACK", "ACK"], "valid": false, "description": "SYN-ACK retransmission before final ACK", "category": "Retransmission"}
+{"trace_id": "T076", "sequence": ["SYN", "SYN-ACK", "ACK"], "valid": true, "description": "Valid 3-way handshake (variant 3)", "category": "Normal"}

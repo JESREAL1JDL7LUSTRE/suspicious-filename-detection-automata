@@ -245,7 +245,7 @@ export function GraphVisualization({
       return {
         ...edge,
         type: 'default', // Classic bezier-style curve
-        animated: !!(isVisitedEdge && isScanMode), // Only visited transitions get motion
+        animated: isVisitedEdge && isScanMode, // Only visited transitions get motion
         markerEnd: {
           type: MarkerType.ArrowClosed,
           width: arrowSize,
