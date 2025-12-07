@@ -55,3 +55,5 @@ Makefile
 *.so
 
 mock_files
+
+suspicious-filename-detection-automata
