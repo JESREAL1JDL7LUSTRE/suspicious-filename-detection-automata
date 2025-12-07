@@ -233,14 +233,54 @@ int main(int argc, char* argv[]) {
         pdaModule.loadDataset("archive/tcp_tricks.jsonl");
 
         // Compute intersection: suspicious filenames (DFA) ∩ content-malicious (DFA)
-        std::set<std::string> suspiciousSet(suspiciousGlobal.begin(), suspiciousGlobal.end());
+        // Normalize identifiers to improve matching across datasets
+        auto toLower = [](std::string s){ std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){return (char)std::tolower(c);}); return s; };
+        std::set<std::string> suspiciousSet;
+        for (auto id : suspiciousGlobal) { suspiciousSet.insert(toLower(id)); }
         std::vector<TCPTrace> tricks = JSONParser::loadTCPDataset("archive/tcp_tricks.jsonl");
         std::set<std::string> contentMalicious;
         for (const auto& t : tricks) {
-            if (suspiciousSet.count(t.trace_id) == 0) continue; // filename must be suspicious first
+            std::string normId = toLower(t.trace_id);
+            if (suspiciousSet.count(normId) == 0) continue; // filename must be suspicious first
             if (dfaModule.scanContent(t.content)) {
-                contentMalicious.insert(t.trace_id);
+                contentMalicious.insert(normId);
             }
+        }
+        // Also consider CSV dataset contents for gating (union with JSONL)
+        try {
+            std::ifstream csv("archive/combined_with_tcp.csv");
+            if (csv.is_open()) {
+                std::string header; std::getline(csv, header);
+                // Determine column indices dynamically
+                std::vector<std::string> cols; {
+                    std::stringstream hs(header); std::string col; while (std::getline(hs, col, ',')) cols.push_back(col);
+                }
+                auto findCol = [&](const std::vector<std::string>& names){
+                    for (size_t i=0;i<cols.size();++i){
+                        std::string c = toLower(cols[i]);
+                        for (const auto& n : names){ if (c == n) return (int)i; }
+                    }
+                    return -1;
+                };
+                int idCol = findCol({"trace_id","id","filename","file","name"});
+                int contentCol = findCol({"content","payload","text","body"});
+                std::string line;
+                while (std::getline(csv, line)){
+                    if (line.empty()) continue;
+                    std::vector<std::string> fields; {
+                        std::stringstream ls(line); std::string f; while (std::getline(ls, f, ',')) fields.push_back(f);
+                    }
+                    if (idCol>=0 && idCol<(int)fields.size() && contentCol>=0 && contentCol<(int)fields.size()){
+                        std::string id = toLower(fields[idCol]);
+                        std::string content = fields[contentCol];
+                        if (suspiciousSet.count(id)>0 && dfaModule.scanContent(content)){
+                            contentMalicious.insert(id);
+                        }
+                    }
+                }
+            }
+        } catch (...) {
+            // ignore CSV read errors
         }
 
         // Pipeline summary before gating
@@ -281,6 +321,25 @@ int main(int argc, char* argv[]) {
         // 4. PDA Validation — Sample Randomized Results
         std::cout << "4. PDA Validation — Sample Randomized Results" << std::endl;
         pdaModule.testAllTraces();      // Validate all traces
+
+        // Collect final malicious IDs: those rejected by PDA
+        std::vector<std::string> finalMalicious = pdaModule.collectRejectedIds();
+
+        // Write final malicious IDs to output
+        try {
+            std::ofstream out("output/final_malicious_ids.txt");
+            if (out.is_open()) {
+                for (const auto& id : finalMalicious) out << id << "\n";
+                out.close();
+            }
+        } catch (...) { /* ignore file errors */ }
+
+        // Stage summary
+        std::cout << "\n[PIPELINE SUMMARY]" << std::endl;
+        std::cout << "  Filename DFA flagged: " << suspiciousSet.size() << std::endl;
+        std::cout << "  Content DFA flagged within suspicious: " << contentMalicious.size() << std::endl;
+        std::cout << "  PDA validated: " << pdaModule.getMetrics().total_traces << std::endl;
+        std::cout << "  Final malicious (PDA rejected): " << finalMalicious.size() << std::endl;
         
         // 5. Stack Trace Examples
         std::cout << "5. Stack Trace Examples" << std::endl;
