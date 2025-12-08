@@ -16,7 +16,7 @@ The **Suspicious Filename Detector** is a standalone Windows application that sc
 
 ## Download
 
-**Pre-built Installer:** [Download](https://drive.google.com/drive/folders/1F_leisR66gUxiMaps0AEfECVLkLTjDjj?usp=sharing)
+**Pre-built Installer:** [Download](https://drive.google.com/drive/folders/1c1QoPBVeMr7HVps5rsW5NU2sXTjHZrDe?usp=sharing)
 
 ---
 
