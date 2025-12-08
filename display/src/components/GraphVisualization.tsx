@@ -187,10 +187,10 @@ export function GraphVisualization({
   }, [graph.nodes, visitedStates, isScanMode])
 
   // Style edges with arrow heads, curved paths, and dynamic coloring
-  const styledEdges = useMemo(() => {
+  const styledEdges: Edge[] = useMemo(() => {
     // Create a set of visited state IDs for quick lookup
     const visitedStateIds = new Set(visitedStates.map(vs => vs.stateId))
-    
+
     // Create a map of visited states with their colors (most recent visit wins)
     // Use the same logic as coloredNodes for consistency
     const stateVisitMap = new Map<string, { status: 'suspicious' | 'safe', severity: 'high' | 'medium' | 'low' | 'safe', timestamp: number }>()
@@ -204,7 +204,7 @@ export function GraphVisualization({
         })
       }
     }
-    
+
     // Build color map from stateVisitMap
     const stateColorMap = new Map<string, string>()
     for (const [stateId, info] of stateVisitMap.entries()) {
@@ -217,24 +217,24 @@ export function GraphVisualization({
         stateColorMap.set(stateId, '#3b82f6') // blue
       }
     }
-    
+
     return graph.edges.map((edge: Edge) => {
       // Extract state IDs from source and target
       const sourceStateMatch = edge.source.match(/q?(\d+)/i)
       const targetStateMatch = edge.target.match(/q?(\d+)/i)
       const sourceStateId = sourceStateMatch ? `q${sourceStateMatch[1]}` : null
       const targetStateId = targetStateMatch ? `q${targetStateMatch[1]}` : null
-      
+
       // Check if this edge connects visited states
       const sourceVisited = sourceStateId && visitedStateIds.has(sourceStateId)
       const targetVisited = targetStateId && visitedStateIds.has(targetStateId)
       const isVisitedEdge = sourceVisited && targetVisited
-      
+
       // Determine edge color based on visited state
       let edgeColor = '#64748b' // Default gray
       const strokeWidth = 1.5 // Slim lines so they feel like moving dots when animated
       const arrowSize = 14 // Slightly larger arrow head
-      
+
       if (isVisitedEdge && isScanMode && targetStateId) {
         // Use target state color (where the transition leads)
         const targetColor = stateColorMap.get(targetStateId)
@@ -242,11 +242,11 @@ export function GraphVisualization({
           edgeColor = targetColor
         }
       }
-      
+
       return {
         ...edge,
         type: 'default', // Classic bezier-style curve
-        animated: isVisitedEdge && isScanMode, // Only visited transitions get motion
+        animated: isVisitedEdge && isScanMode ? true : undefined, // Only visited transitions get motion
         markerEnd: {
           type: MarkerType.ArrowClosed,
           width: arrowSize,
@@ -274,7 +274,7 @@ export function GraphVisualization({
           strokeWidth: 1,
           strokeOpacity: 0.3
         }
-      }
+      } as Edge
     })
   }, [graph.edges, visitedStates, isScanMode])
 
