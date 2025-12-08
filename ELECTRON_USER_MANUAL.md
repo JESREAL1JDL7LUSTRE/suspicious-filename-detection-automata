@@ -14,6 +14,12 @@ The **Suspicious Filename Detector** is a standalone Windows application that sc
 
 ---
 
+## Download
+
+**Pre-built Installer:** [Download](https://drive.google.com/drive/folders/1F_leisR66gUxiMaps0AEfECVLkLTjDjj?usp=sharing)
+
+---
+
 ## System Requirements
 
 - **Operating System:** Windows 10 or later (64-bit)
