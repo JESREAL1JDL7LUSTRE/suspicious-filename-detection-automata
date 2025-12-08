@@ -591,3 +591,19 @@ std::string PDAModule::exportGraphviz() const {
 }
 
 } // namespace CS311
+
+namespace CS311 {
+
+std::vector<std::string> PDAModule::collectRejectedIds() {
+    std::vector<std::string> rejected;
+    // Validate each trace in the current dataset and collect those the PDA rejects
+    for (const auto& t : dataset) {
+        bool ok = validateSequence(t.sequence);
+        if (!ok) {
+            rejected.push_back(t.trace_id);
+        }
+    }
+    return rejected;
+}
+
+} // namespace CS311

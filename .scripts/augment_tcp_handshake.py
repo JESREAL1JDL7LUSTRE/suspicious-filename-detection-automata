@@ -158,13 +158,14 @@ def main():
     comb_path = os.path.join(OLD_DATASET, 'combined_random.csv')
     malw_path = os.path.join(OLD_DATASET, 'malware.csv')
 
-    # 1) Build TCP traces for the tricks JSONL dataset (write JSONL)
+    # 1) Build TCP traces for the tricks JSONL dataset (write JSONL, preserve labels)
     tricks = read_jsonl_filenames(jsonl_path)
     written_tricks = 0
+    # Overwrite tricks JSONL (fresh each run)
     with open(OUT_TRICKS, 'w', encoding='utf-8') as out:
         for filename, is_mal in tricks:
-            seq, valid, desc, cat = choose_sequence(is_mal or True)
-            content = choose_content(is_mal or True)
+            seq, valid, desc, cat = choose_sequence(is_mal)
+            content = choose_content(is_mal)
             rec = {
                 "trace_id": filename,
                 "sequence": seq,
@@ -219,21 +220,30 @@ def main():
         dedup_csv.append((fn, mal))
 
     written_csv = 0
-    # Write a CSV with columns: trace_id,sequence,valid,description,category
-    # sequence is pipe-delimited tokens to avoid commas
-    with open(OUT_CSV, 'w', encoding='utf-8', newline='') as f:
+    # 2b) Also include CSV-derived entries into JSONL so both datasets are equally usable
+    # Overwrite CSV fresh and write JSONL entries for CSV rows too (malicious + benign)
+    with open(OUT_CSV, 'w', encoding='utf-8', newline='') as f, open(OUT_TRICKS, 'a', encoding='utf-8') as out_jsonl:
         writer = csv.writer(f)
-        # Include synthetic content column for downstream DFA-on-contents
         writer.writerow(["trace_id","sequence","valid","description","category","content"])
         for filename, is_mal in dedup_csv:
             seq, valid, desc, cat = choose_sequence(is_mal)
             seq_str = "|".join(seq)
             content = choose_content(is_mal)
             writer.writerow([filename, seq_str, "true" if valid else "false", desc, cat, content])
+            rec = {
+                "trace_id": filename,
+                "sequence": seq,
+                "valid": valid,
+                "description": desc,
+                "category": cat,
+                "content": content,
+            }
+            out_jsonl.write(json.dumps(rec) + "\n")
             written_csv += 1
 
-    print(f"Wrote {written_tricks} TCP trick traces to {OUT_TRICKS}")
-    print(f"Wrote {written_csv} TCP CSV traces to {OUT_CSV}")
+    # Final stats
+    print(f"Wrote {written_tricks} trick JSONL traces (malicious+benign) to {OUT_TRICKS}")
+    print(f"Wrote {written_csv} CSV traces (malicious+benign) to {OUT_CSV} and mirrored them into JSONL")
 
 
 if __name__ == '__main__':
