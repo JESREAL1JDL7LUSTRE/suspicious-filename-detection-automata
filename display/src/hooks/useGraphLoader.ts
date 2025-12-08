@@ -12,7 +12,7 @@ export function useGraphLoader() {
   const files = useMemo(
     () => [
       'automata.json',
-      'pda.json',
+      // Minimized DFAs (pattern-based)
       'dfa_min_0.json',
       'dfa_min_1.json',
       'dfa_min_2.json',
@@ -22,6 +22,14 @@ export function useGraphLoader() {
       'dfa_min_6.json',
       'dfa_min_7.json',
       'dfa_min_8.json',
+      // Content DFAs
+      'dfa_content_min_0.json',
+      'dfa_content_min_1.json',
+      'dfa_content_min_2.json',
+      'dfa_content_min_3.json',
+      'dfa_content_min_4.json',
+      // PDA
+      'pda.json'
     ],
     []
   )

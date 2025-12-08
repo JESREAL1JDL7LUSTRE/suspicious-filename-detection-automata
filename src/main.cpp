@@ -3,6 +3,7 @@
  * Main Program - Now follows the architecture properly
  */
 #include <iostream>
+#include <cstdio>
 #ifdef _WIN32
 #include <windows.h>
 #endif
@@ -25,6 +26,13 @@ int main(int argc, char* argv[]) {
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
 #endif
+
+    // CRITICAL FIX: Disable C++ buffering for stdout/stderr
+    // When stdout is piped (like to Node.js), C++ defaults to full buffering
+    // This prevents frontend from seeing real-time state transitions
+    std::cout.setf(std::ios::unitbuf);  // Enable unit buffering (flush after every output)
+    std::cerr.setf(std::ios::unitbuf);
+    std::setvbuf(stdout, nullptr, _IONBF, 0);  // Also tell C stdio to use no buffering
 
     // Create module instances and ensure output directory exists
     std::filesystem::create_directories("output");
@@ -225,14 +233,54 @@ int main(int argc, char* argv[]) {
         pdaModule.loadDataset("archive/tcp_tricks.jsonl");
 
         // Compute intersection: suspicious filenames (DFA) ∩ content-malicious (DFA)
-        std::set<std::string> suspiciousSet(suspiciousGlobal.begin(), suspiciousGlobal.end());
+        // Normalize identifiers to improve matching across datasets
+        auto toLower = [](std::string s){ std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){return (char)std::tolower(c);}); return s; };
+        std::set<std::string> suspiciousSet;
+        for (auto id : suspiciousGlobal) { suspiciousSet.insert(toLower(id)); }
         std::vector<TCPTrace> tricks = JSONParser::loadTCPDataset("archive/tcp_tricks.jsonl");
         std::set<std::string> contentMalicious;
         for (const auto& t : tricks) {
-            if (suspiciousSet.count(t.trace_id) == 0) continue; // filename must be suspicious first
+            std::string normId = toLower(t.trace_id);
+            if (suspiciousSet.count(normId) == 0) continue; // filename must be suspicious first
             if (dfaModule.scanContent(t.content)) {
-                contentMalicious.insert(t.trace_id);
+                contentMalicious.insert(normId);
             }
+        }
+        // Also consider CSV dataset contents for gating (union with JSONL)
+        try {
+            std::ifstream csv("archive/combined_with_tcp.csv");
+            if (csv.is_open()) {
+                std::string header; std::getline(csv, header);
+                // Determine column indices dynamically
+                std::vector<std::string> cols; {
+                    std::stringstream hs(header); std::string col; while (std::getline(hs, col, ',')) cols.push_back(col);
+                }
+                auto findCol = [&](const std::vector<std::string>& names){
+                    for (size_t i=0;i<cols.size();++i){
+                        std::string c = toLower(cols[i]);
+                        for (const auto& n : names){ if (c == n) return (int)i; }
+                    }
+                    return -1;
+                };
+                int idCol = findCol({"trace_id","id","filename","file","name"});
+                int contentCol = findCol({"content","payload","text","body"});
+                std::string line;
+                while (std::getline(csv, line)){
+                    if (line.empty()) continue;
+                    std::vector<std::string> fields; {
+                        std::stringstream ls(line); std::string f; while (std::getline(ls, f, ',')) fields.push_back(f);
+                    }
+                    if (idCol>=0 && idCol<(int)fields.size() && contentCol>=0 && contentCol<(int)fields.size()){
+                        std::string id = toLower(fields[idCol]);
+                        std::string content = fields[contentCol];
+                        if (suspiciousSet.count(id)>0 && dfaModule.scanContent(content)){
+                            contentMalicious.insert(id);
+                        }
+                    }
+                }
+            }
+        } catch (...) {
+            // ignore CSV read errors
         }
 
         // Pipeline summary before gating
@@ -273,6 +321,25 @@ int main(int argc, char* argv[]) {
         // 4. PDA Validation — Sample Randomized Results
         std::cout << "4. PDA Validation — Sample Randomized Results" << std::endl;
         pdaModule.testAllTraces();      // Validate all traces
+
+        // Collect final malicious IDs: those rejected by PDA
+        std::vector<std::string> finalMalicious = pdaModule.collectRejectedIds();
+
+        // Write final malicious IDs to output
+        try {
+            std::ofstream out("output/final_malicious_ids.txt");
+            if (out.is_open()) {
+                for (const auto& id : finalMalicious) out << id << "\n";
+                out.close();
+            }
+        } catch (...) { /* ignore file errors */ }
+
+        // Stage summary
+        std::cout << "\n[PIPELINE SUMMARY]" << std::endl;
+        std::cout << "  Filename DFA flagged: " << suspiciousSet.size() << std::endl;
+        std::cout << "  Content DFA flagged within suspicious: " << contentMalicious.size() << std::endl;
+        std::cout << "  PDA validated: " << pdaModule.getMetrics().total_traces << std::endl;
+        std::cout << "  Final malicious (PDA rejected): " << finalMalicious.size() << std::endl;
         
         // 5. Stack Trace Examples
         std::cout << "5. Stack Trace Examples" << std::endl;
@@ -420,13 +487,29 @@ DOT_EXPORTS:
         auto parseGraphvizToJson = [&](const std::string& gv, const std::string& type, const std::string& outPath){
             std::vector<NodeOut> nodes;
             std::vector<EdgeOut> edges;
-            std::vector<std::string> accept; // TODO: populate from modules when available
+            std::vector<std::string> accept;
             std::string start;
+            std::set<std::string> acceptSet;
 
             std::istringstream iss(gv);
             std::string line;
             while (std::getline(iss, line)) {
                 if (line.empty()) continue;
+                
+                // Parse accepting states: look for nodes marked with double circle or shape=doublecircle
+                // Example: "Q_ACCEPT [shape=doublecircle]" or entries in node attributes
+                size_t shapePos = line.find("shape=doublecircle");
+                if (shapePos != std::string::npos) {
+                    // Extract node id before the shape attribute
+                    size_t bracketPos = line.find('[');
+                    if (bracketPos != std::string::npos) {
+                        std::string nodeId = trim(line.substr(0, bracketPos));
+                        if (!nodeId.empty() && nodeId.find("->") == std::string::npos) {
+                            acceptSet.insert(nodeId);
+                        }
+                    }
+                }
+                
                 auto arrowPos = line.find("->");
                 if (arrowPos != std::string::npos) {
                     std::string left = trim(line.substr(0, arrowPos));
@@ -460,6 +543,11 @@ DOT_EXPORTS:
 
             start = nodes.empty()? std::string("S0") : nodes.front().id;
             for (const auto& n : nodes) { if (n.id.find("_s0")!=std::string::npos) { start = n.id; break; } }
+
+            // Convert acceptSet to vector
+            for (const auto& a : acceptSet) {
+                accept.push_back(a);
+            }
 
             bool ok = writeAutomataJson(type, start, accept, nodes, edges, outPath);
             if (ok) std::cout << "[OK] Wrote " << outPath << std::endl; else std::cerr << "[WARN] Could not write " << outPath << std::endl;

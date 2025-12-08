@@ -57,3 +57,5 @@ Makefile
 mock_files
 node_modules
 release
+
+suspicious-filename-detection-automata

@@ -1,6 +1,3 @@
-PS D:\SCHOOL\Automata\suspicious-filename-detection-automata> make
-g++ -std=c++17 -Wall -Wextra -O2 -I./src -I./src/dfa -I./src/pda -I./src/regexparser -I./src/jsonparser -c src/main.cpp -o obj/main.o
-g++ obj/main.o obj/regexparser/RegexParser.o obj/pda/PDAModule.o obj/dfa/DFAModule.o obj/jsonparser/JSONParser.o obj/AutomataJSON.o -o simulator
 PS D:\SCHOOL\Automata\suspicious-filename-detection-automata> .\simulator.exe
 Starting simulator...
 ╔══════════════════════════════════════════════════════════════╗
@@ -20,14 +17,14 @@ Uses Deterministic Finite Automaton (DFA)
 1. Dataset Loading
 [INFO] Reading tricks dataset: archive/tcp_tricks.jsonl
 [INFO] Loading TCP trace dataset: archive/tcp_tricks.jsonl
-[SUCCESS] Loaded 338 TCP traces
-  Valid sequences: 0
-  Invalid sequences: 338
+[SUCCESS] Loaded 14132 TCP traces
+  Valid sequences: 1971
+  Invalid sequences: 12161
 [INFO] Loading filename dataset from TCP JSONL: archive/tcp_tricks.jsonl
-[SUCCESS] Loaded 338 filename entries (from traces)
-  Malicious: 338, Benign: 0
+[SUCCESS] Loaded 14132 filename entries (from traces)
+  Malicious: 12161, Benign: 1971
 ✓ SUCCESS — Trick dataset loaded
-  Filenames staged (tricks): 338
+  Filenames staged (tricks): 14132
 [INFO] Reading CSV traces dataset: archive/combined_with_tcp.csv
 [INFO] Loading TCP trace dataset (CSV): archive/combined_with_tcp.csv
 [SUCCESS] Loaded 13794 TCP traces (CSV)
@@ -59,36 +56,36 @@ Uses Deterministic Finite Automaton (DFA)
 
 3. Regex → NFA (Thompson’s Construction)
 [INFO] Converting regex to NFAs (Thompson's Construction)...
-  Built NFA for 'exe' - 5 states (time: 98 μs)
-  Built NFA for 'scr' - 5 states (time: 30 μs)
-  Built NFA for 'bat' - 5 states (time: 27 μs)
-  Built NFA for 'vbs' - 5 states (time: 31 μs)
-  Built NFA for 'update' - 8 states (time: 30 μs)
-  Built NFA for 'password' - 10 states (time: 31 μs)
-  Built NFA for 'stealer' - 9 states (time: 33 μs)
-  Built NFA for 'setup' - 7 states (time: 31 μs)
-  Built NFA for 'patch' - 7 states (time: 29 μs)
+  Built NFA for 'exe' - 5 states (time: 63 μs)
+  Built NFA for 'scr' - 5 states (time: 39 μs)
+  Built NFA for 'bat' - 5 states (time: 23 μs)
+  Built NFA for 'vbs' - 5 states (time: 20 μs)
+  Built NFA for 'update' - 8 states (time: 15 μs)
+  Built NFA for 'password' - 10 states (time: 16 μs)
+  Built NFA for 'stealer' - 9 states (time: 24 μs)
+  Built NFA for 'setup' - 7 states (time: 67 μs)
+  Built NFA for 'patch' - 7 states (time: 38 μs)
 [SUCCESS] Built 9 NFAs
   Total NFA states: 61
-  Total time: 5186 μs
+  Total time: 8171 μs
   Complexity: O(|regex|) per pattern (Thompson's Construction)
 
 ✓ SUCCESS — Total NFA states: 61
 
 4. NFA → DFA (Subset Construction)
 [INFO] Converting NFAs to DFAs (Subset Construction)...
-  Converted NFA 1 -> DFA with 7 states (time: 3665 μs)
-  Converted NFA 2 -> DFA with 7 states (time: 2416 μs)
-  Converted NFA 3 -> DFA with 7 states (time: 2517 μs)
-  Converted NFA 4 -> DFA with 7 states (time: 1819 μs)
-  Converted NFA 5 -> DFA with 13 states (time: 4262 μs)
-  Converted NFA 6 -> DFA with 17 states (time: 4958 μs)
-  Converted NFA 7 -> DFA with 15 states (time: 5763 μs)
-  Converted NFA 8 -> DFA with 11 states (time: 3637 μs)
-  Converted NFA 9 -> DFA with 11 states (time: 3039 μs)
+  Converted NFA 1 -> DFA with 7 states (time: 1716 μs)
+  Converted NFA 2 -> DFA with 7 states (time: 2119 μs)
+  Converted NFA 3 -> DFA with 7 states (time: 1224 μs)
+  Converted NFA 4 -> DFA with 7 states (time: 1166 μs)
+  Converted NFA 5 -> DFA with 13 states (time: 3099 μs)
+  Converted NFA 6 -> DFA with 17 states (time: 2567 μs)
+  Converted NFA 7 -> DFA with 15 states (time: 2363 μs)
+  Converted NFA 8 -> DFA with 11 states (time: 1427 μs)
+  Converted NFA 9 -> DFA with 11 states (time: 1195 μs)
 [SUCCESS] Built 9 DFAs
   Total states before minimization: 95
-  Total time: 42554 μs
+  Total time: 28907 μs
   Complexity: O(2^n) worst-case, where n = NFA states
   Empirical: 61 NFA states → 95 DFA states
 
@@ -108,7 +105,7 @@ Uses Deterministic Finite Automaton (DFA)
 [SUCCESS] Minimized DFAs (Hopcroft)
   States after minimization: 52
   Reduction: 45.2632%
-  Total time: 56373 μs
+  Total time: 24216 μs
   Complexity: O(k n log n) where k = |alphabet|, n = |DFA states|
   Empirical: 95 states → 52 states
 
@@ -124,23 +121,23 @@ Uses Deterministic Finite Automaton (DFA)
 [INFO] Defining content regex patterns...
 [SUCCESS] Defined 5 content patterns
 [INFO] Converting content regex to NFAs...
-  Built NFA for content '(powershell\.exe\s+-nop|powershell\s+-exec\s+bypass|powershell)' - 65 states
+  Built NFA for content 'powershell' - 12 states
   Built NFA for content '(invoke-expression|iex\s*\(|invoke-webrequest|downloadstring)' - 63 states
-  Built NFA for content '(cmd(\.exe)?\s+/c|cmd)' - 24 states
+  Built NFA for content 'cmd)' - 6 states
   Built NFA for content 'TVqQAAMAAAAEAAAA' - 18 states
   Built NFA for content '(autoopen\(|document_open\(|workbook_open\()' - 46 states
 [SUCCESS] Built 5 content NFAs
 [INFO] Converting content NFAs to DFAs...
-  Converted content NFA 1 -> DFA with 127 states
+  Converted content NFA 1 -> DFA with 21 states
   Converted content NFA 2 -> DFA with 123 states
-  Converted content NFA 3 -> DFA with 45 states
+  Converted content NFA 3 -> DFA with 9 states
   Converted content NFA 4 -> DFA with 33 states
   Converted content NFA 5 -> DFA with 89 states
 [SUCCESS] Built 5 content DFAs
 [INFO] Minimizing content DFAs (Hopcroft)...
-  Content DFA 1: refinement steps = 62, final equivalence classes = 64
+  Content DFA 1: refinement steps = 9, final equivalence classes = 11
   Content DFA 2: refinement steps = 60, final equivalence classes = 62
-  Content DFA 3: refinement steps = 21, final equivalence classes = 23
+  Content DFA 3: refinement steps = 3, final equivalence classes = 5
   Content DFA 4: refinement steps = 15, final equivalence classes = 17
   Content DFA 5: refinement steps = 43, final equivalence classes = 45
 [SUCCESS] Minimized content DFAs
@@ -165,9 +162,9 @@ Uses Deterministic Finite Automaton (DFA)
 ╚═══════════════════════════════════════════════════════════╝
 
 [CONTENT PATTERNS]
-  Pattern 1: powershell_family ('(powershell\.exe\s+-nop|powershell\s+-exec\s+bypass|powershell)')
+  Pattern 1: powershell ('powershell')
   Pattern 2: invoke_family ('(invoke-expression|iex\s*\(|invoke-webrequest|downloadstring)')
-  Pattern 3: cmd_family ('(cmd(\.exe)?\s+/c|cmd)')
+  Pattern 3: cmd_family ('cmd)')
   Pattern 4: mz_base64 ('TVqQAAMAAAAEAAAA')
   Pattern 5: macro_autoexec ('(autoopen\(|document_open\(|workbook_open\()')
 
@@ -175,16 +172,16 @@ Uses Deterministic Finite Automaton (DFA)
   DFAs built:            5
   DFAs after minimization:5
 [INFO] Loading TCP trace dataset: archive/tcp_tricks.jsonl
-[SUCCESS] Loaded 338 TCP traces
-  Valid sequences: 0
-  Invalid sequences: 338
+[SUCCESS] Loaded 14132 TCP traces
+  Valid sequences: 1971
+  Invalid sequences: 12161
 
 [SAMPLE CONTENT RESULTS (RANDOMIZED)]
-[Content_001] trace_id='file.doc:malware.js' → BENIGN
-[Content_002] trace_id='image.tiff.bat' → BENIGN
-[Content_003] trace_id='system.dev/zero.exe' → BENIGN
-[Content_004] trace_id='script.js:exploit' → BENIGN
-[Content_005] trace_id='file.txt:evil.exe' → BENIGN
+[Content_001] trace_id='4851d648ac7b8d3c.exe' → BENIGN
+[Content_002] trace_id='config.ini:poly.vbs' → BENIGN
+[Content_003] trace_id='1af65e47992b406f.exe' → BENIGN
+[Content_004] trace_id='c4279c7f1bdcebe5.exe' → BENIGN
+[Content_005] trace_id='139b1f1498c4ca98.exe' → BENIGN
 6. Sample Filename Detection (Randomized)
 [INFO] Testing 13794 filenames using DFAs...
 [SUCCESS] Testing complete
@@ -206,8 +203,8 @@ False Negatives:   0
 Accuracy:      100%
 
 Execution Time:
-  Total:        25 ms
-  Per file:     0.00181238 ms
+  Total:        37 ms
+  Per file:     0.00268233 ms
 
 
 ╔═══════════════════════════════════════════════════════════╗
@@ -215,11 +212,11 @@ Execution Time:
 ╚═══════════════════════════════════════════════════════════╝
 
 [SAMPLE FILENAME RESULTS (RANDOMIZED)]
-[File_001]  "ec79c085e39bc000.exe" → MALICIOUS (matched: executable) [pattern 1]
-[File_002]  "b14ceabdd75ebdbf.exe" → MALICIOUS (matched: executable) [pattern 1]
-[File_003]  "1edb5c54fee229f7.exe" → MALICIOUS (matched: executable) [pattern 1]
-[File_004]  "b7427190145e74fb.txt" → BENIGN
-[File_005]  "7afae88c30981308.txt" → BENIGN
+[File_001]  "182b2e77fd427efe.txt" → BENIGN
+[File_002]  "0f88561d6f75c975.exe" → MALICIOUS (matched: executable) [pattern 1]
+[File_003]  "7cdc05335a554f10.exe" → MALICIOUS (matched: executable) [pattern 1]
+[File_004]  "cd3be6b303682052.exe" → MALICIOUS (matched: executable) [pattern 1]
+[File_005]  "e2f5a21cb3d9ea64.exe" → MALICIOUS (matched: executable) [pattern 1]
 
 [CONFUSION MATRIX DEFINITIONS]
   TP (True Positive):  Malicious file correctly detected as malicious
@@ -251,8 +248,8 @@ Execution Time:
 [PERFORMANCE]
   Patterns:               9
   Files tested:           13794
-  Total execution time:   25 ms (wall-clock)
-  Average per file:       0.00181238 ms
+  Total execution time:   37 ms (wall-clock)
+  Average per file:       0.00268233 ms
   Note: Times measured using std::chrono::high_resolution_clock
 
 [PATTERN → DFA MAPPING]
@@ -282,15 +279,175 @@ Uses Pushdown Automaton (PDA)
 1. Loading TCP Trace Dataset
 [INFO] Reading: archive/tcp_tricks.jsonl
 [INFO] Loading TCP trace dataset: archive/tcp_tricks.jsonl
-[SUCCESS] Loaded 338 TCP traces
-  Valid sequences: 0
-  Invalid sequences: 338
+[SUCCESS] Loaded 14132 TCP traces
+  Valid sequences: 1971
+  Invalid sequences: 12161
 [INFO] Loading TCP trace dataset: archive/tcp_tricks.jsonl
-[SUCCESS] Loaded 338 TCP traces
-  Valid sequences: 0
-  Invalid sequences: 338
-[PIPELINE] DFA filename suspicious: 11823, Content-malicious (within suspicious): 0
-[INFO] No traces meet gating (filename suspicious AND content malicious). Skipping PDA.
+[SUCCESS] Loaded 14132 TCP traces
+  Valid sequences: 1971
+  Invalid sequences: 12161
+[PIPELINE] DFA filename suspicious: 11823, Content-malicious (within suspicious): 2333
+✓ SUCCESS — Loaded 2333 gated traces
+Valid:   0
+Invalid: 2333
+
+2. CFG for TCP 3-Way Handshake
+[INFO] Defining Context-Free Grammar for TCP Handshake...
+
+╔════════════════════════════════════════════════════════╗
+║  CONTEXT-FREE GRAMMAR (Type-2 Chomsky Hierarchy)       ║
+╚════════════════════════════════════════════════════════╝
+
+Production Rules:
+  S  → SYN A                (Start with SYN)
+  A  → SYN-ACK B            (Must respond with SYN-ACK)
+  B  → ACK C                (Complete handshake with ACK)
+  C  → DATA C | FIN | ε     (Data transfer or finish)
+
+Terminals: { SYN, SYN-ACK, ACK, DATA, FIN, RST }
+Non-terminals: { S, A, B, C }
+Start symbol: S
+
+
+[CFG — Canonical Form]
+V = { S, A, B, C }
+Σ = { SYN, SYN-ACK, ACK, DATA, FIN, RST }
+S = S
+P = {
+  S → SYN A,
+  A → SYN-ACK B,
+  B → ACK C,
+  C → DATA C | FIN | ε
+}
+3. PDA Structure
+[INFO] Building PDA from CFG...
+
+[PDA STRUCTURE]
+  States: 5
+    q0: Initial state
+    q1: SYN received (expects SYN-ACK)
+    q2: SYN-ACK received (expects ACK)
+    q3: Handshake complete (ACCEPTING)
+    qE: Error state (REJECTING)
+
+[STACK OPERATIONS]
+  PUSH SYN:      On receiving SYN in q0
+  PUSH SYN-ACK:  On receiving SYN-ACK in q1
+  POP ALL:       On receiving ACK in q2 (pops both SYN-ACK and SYN)
+  Stack empty:   Required for acceptance (state-based + empty stack)
+
+[NOTE] Both SYN and SYN-ACK are pushed to visualize stack depth
+  for pedagogical purposes. In production, only SYN might be pushed,
+  with transitions checking SYN-ACK before popping on ACK.
+
+[SUCCESS] PDA constructed from CFG
+
+[OK] Wrote PDA construction log: output/pda_construction.txt
+4. PDA Validation — Sample Randomized Results
+[INFO] Validating 2333 TCP traces with PDA...
+[SUCCESS] Validation complete
+  Accuracy: 100%
+
+
+[PIPELINE SUMMARY]
+  Filename DFA flagged: 11823
+  Content DFA flagged within suspicious: 2333
+  PDA validated: 2333
+  Final malicious (PDA rejected): 2333
+5. Stack Trace Examples
+
+╔════════════════════════════════════════════════════════╗
+║  STACK TRACE VISUALIZATION                             ║
+╚════════════════════════════════════════════════════════╝
+
+Input sequence: [SYN, SYN-ACK, ACK]
+
+Step-by-step execution:
+  Initial: State=q0, Stack=[BOTTOM]
+  Step 1: Input='SYN'
+         State: q0 → q1
+         Operation: PUSH(SYN) → q1
+         Stack depth: 1
+  Step 2: Input='SYN-ACK'
+         State: q1 → q2
+         Operation: PUSH(SYN-ACK) → q2
+         Stack depth: 2
+  Step 3: Input='ACK'
+         State: q2 → q3
+         Operation: POP(SYN-ACK), POP(SYN) → q3
+         Stack depth: 0
+
+  Final state: q3
+  Stack depth: 0
+  Result: ✓ VALID
+
+
+╔════════════════════════════════════════════════════════╗
+║  STACK TRACE VISUALIZATION                             ║
+╚════════════════════════════════════════════════════════╝
+
+Input sequence: [SYN, ACK]
+
+Step-by-step execution:
+  Initial: State=q0, Stack=[BOTTOM]
+  Step 1: Input='SYN'
+         State: q0 → q1
+         Operation: PUSH(SYN) → q1
+         Stack depth: 1
+  Step 2: Input='ACK'
+         State: q1 → q4
+         Operation: [PRECONDITION MISSING] SYN before SYN-ACK
+         Stack depth: 1 [ERROR]
+
+  Final state: q4
+  Stack depth: 1
+  Result: ✗ INVALID
+
+6. PDA Summary
+
+╔═══════════════════════════════════════════════════════════╗
+║          PDA MODULE - VALIDATION RESULTS                  ║
+╚═══════════════════════════════════════════════════════════╝
+
+[SAMPLE TCP TRACE RESULTS (RANDOMIZED)]
+[Trace_001] 2f13270882d2af1a.exe: INVALID (Synthetic invalid handshake for malicious filename)
+[Trace_002] 07028b82ed457f66.exe: INVALID (Synthetic invalid handshake for malicious filename)
+[Trace_003] 133a772781f9727e.exe: INVALID (Synthetic invalid handshake for malicious filename)
+[Trace_004] 345841f6f97888b8.exe: INVALID (Synthetic invalid handshake for malicious filename)
+[Trace_005] 653b4f363d9d421b.exe: INVALID (Synthetic invalid handshake for malicious filename)
+
+[VALIDATION METRICS]
+  ✓ Valid accepted:       0 / 0
+  ✓ Invalid rejected:     2333 / 2333
+  ✗ False positives:      0
+  ✗ False negatives:      0
+  Validation accuracy:    100%
+
+[STACK METRICS]
+  Average stack depth:    0.672953
+  Maximum stack depth:    2
+
+[CONFUSION MATRIX DEFINITIONS]
+  TP (True Positive):  Valid trace correctly accepted
+  FP (False Positive): Invalid trace incorrectly accepted
+  TN (True Negative):  Invalid trace correctly rejected
+  FN (False Negative): Valid trace incorrectly rejected
+
+[CONFUSION MATRIX]
+  ✓ True Positives (TP):   0
+  ✗ False Positives (FP):  0
+  ✓ True Negatives (TN):   2333
+  ✗ False Negatives (FN):  0
+  Precision:               0%
+  Recall:                  0%
+  F1 Score:                0%
+
+[PERFORMANCE]
+  Total traces:           2333
+  Total execution time:   1.176 ms (wall-clock)
+  Average per trace:      0.000504072 ms
+  Note: Times measured using std::chrono::high_resolution_clock
+
 [OK] Wrote minimized DFA DOT: output/dfa_min_0.dot (pattern: executable)
 [OK] Wrote minimized DFA DOT: output/dfa_min_1.dot (pattern: screensaver)
 [OK] Wrote minimized DFA DOT: output/dfa_min_2.dot (pattern: batch_file)

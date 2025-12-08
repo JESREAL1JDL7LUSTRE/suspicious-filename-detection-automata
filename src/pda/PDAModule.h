@@ -54,6 +54,8 @@ public:
     void filterDatasetByTraceIds(const std::set<std::string>& ids);
     // Synthesize traces for given filenames (valid=true for good, false for bad)
     void synthesizeTracesForFilenames(const std::vector<std::string>& filenames, bool valid);
+    // Collect trace_ids rejected by PDA for current gated dataset
+    std::vector<std::string> collectRejectedIds();
     
     // Getters
     const PDAMetrics& getMetrics() const { return metrics; }
