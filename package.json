@@ -10,14 +10,11 @@
     "build:frontend": "npm run build --prefix display",
     "build:portable": "node build-portable.js",
     "build:sfx": "node build-sfx.js",
-    "build:all": "npm run build:cpp && npm run build:frontend && npm run build:portable && npm run build:sfx",
-    "build:port": "npm run build:cpp && npm run build:frontend && npm run build:portable"
+    "build:all": "npm run build:cpp && npm run build:frontend && npm run build:portable && npm run build:sfx"
   },
   "dependencies": {
-    "bytes": "^3.1.2",
     "cors": "^2.8.5",
-    "express": "^4.18.2",
-    "safer-buffer": "^2.1.2"
+    "express": "^4.18.2"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
