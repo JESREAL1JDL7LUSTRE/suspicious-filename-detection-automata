@@ -29,7 +29,7 @@ export function useOutputDir(): string {
       
       // Last resort fallback
       console.warn('Using fallback path - may not work correctly')
-      return '../output'
+      return '../bin/output'
     },
     []
   )

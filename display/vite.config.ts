@@ -5,6 +5,7 @@ import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: './',
   plugins: [react(), tailwindcss()],
   server: {
     fs: {
@@ -30,5 +31,19 @@ export default defineConfig({
     'import.meta.env.VITE_OUTPUT_DIR': JSON.stringify(
       path.resolve(__dirname, '..', 'output').replace(/\\/g, '/')
     )
+  },
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    // CRITICAL: Don't use polyfills that might break in Electron
+    target: 'esnext',
+    minify: 'esbuild',
+    sourcemap: false,
+    // Ensure assets use relative paths
+    rollupOptions: {
+      output: {
+        manualChunks: undefined
+      }
+    }
   }
 })

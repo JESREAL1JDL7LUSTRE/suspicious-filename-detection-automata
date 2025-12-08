@@ -1,6 +1,6 @@
 import { useCallback, useState, useRef } from 'react'
 
-const API_URL = '' // Use proxy from vite.config
+import { API_BASE_URL } from '../config'
 
 export interface ScanResult {
   file: string
@@ -51,7 +51,7 @@ export function useFileScan(onComplete?: (results: ScanResult[]) => void) {
       
       let response: Response
       try {
-        response = await fetch(`${API_URL}/api/scan`, {
+        response = await fetch(`${API_BASE_URL}/api/scan`, {
           method: 'POST',
           signal: abortController.signal,
           headers: {
@@ -128,7 +128,7 @@ export function useFileScan(onComplete?: (results: ScanResult[]) => void) {
                     // Debug: log if message contains state transitions
                     if (message.includes('State:') || message.includes('Final state')) {
                       console.log('📦 Message contains state transitions, splitting into', lines.length, 'lines')
-                      console.log('📦 Sample lines:', lines.slice(0, 5).map(l => l.substring(0, 80)))
+                      console.log('📦 Sample lines:', lines.slice(0, 5).map((l: string) => l.substring(0, 80)))
                       console.log('📦 Full message:', message)
                     }
                     

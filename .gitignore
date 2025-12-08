@@ -6,15 +6,15 @@ simulator
 *.app
 
 # Object files
-obj/
+# obj/
 *.o
-*.obj
+# *.obj
 
 # Build artifacts
 *.a
 *.lib
 *.so
-*.dll
+# *.dll
 *.dylib
 
 # Output directory (generated at runtime)
@@ -49,9 +49,11 @@ Makefile
 # Compiled source files
 *.com
 *.class
-*.dll
+# *.dll
 *.exe
 *.o
 *.so
 
 mock_files
+node_modules
+release

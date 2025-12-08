@@ -1,6 +1,5 @@
 import { useCallback, useState, useRef } from 'react'
-
-const API_URL = '' // Use proxy from vite.config
+import { API_BASE_URL } from '../config'
 
 export function useSimulator(onComplete?: () => void) {
   const [terminalOutput, setTerminalOutput] = useState<string[]>([])
@@ -20,15 +19,15 @@ export function useSimulator(onComplete?: () => void) {
 
     setIsRunning(true)
     setTerminalOutput([])
-    setHasRunSimulator(false) // Reset when starting a new run
+    setHasRunSimulator(false)
 
     try {
-      console.log('Starting fetch request to /api/run-simulator')
+      const url = `${API_BASE_URL}/api/run-simulator`;
+      console.log('Fetching from:', url);
       
-      // Use a separate try-catch for the fetch itself
       let response: Response
       try {
-        response = await fetch(`${API_URL}/api/run-simulator`, {
+        response = await fetch(url, {
           method: 'POST',
           signal: abortController.signal,
           headers: {
@@ -36,9 +35,9 @@ export function useSimulator(onComplete?: () => void) {
           },
         })
       } catch (fetchError: any) {
-        console.error('Fetch error:', fetchError)
+        console.error('Fetch error:', fetchError);
         if (fetchError.name === 'AbortError') {
-          throw fetchError // Re-throw abort errors
+          throw fetchError
         }
         throw new Error(`Failed to connect: ${fetchError.message}`)
       }
@@ -59,7 +58,6 @@ export function useSimulator(onComplete?: () => void) {
       console.log('Starting to read stream...')
       let buffer = ''
 
-      // Read stream in a loop
       const readStream = async () => {
         try {
           let hasReceivedData = false
@@ -98,50 +96,39 @@ export function useSimulator(onComplete?: () => void) {
                   console.log('Received SSE data type:', data.type)
                   
                   if (data.type === 'stdout' || data.type === 'stderr') {
-                    // Split message by newlines to handle multi-line messages
                     const message = data.message || ''
                     const lines = message.split(/\r?\n/)
                     
-                    // Filter out duplicate "Starting simulator" messages from stdout/stderr
-                    // (C++ program also outputs this, but server already sends it as 'start' message)
                     const filteredLines = lines.filter((line: string) => {
                       const trimmed = line.trim().toLowerCase()
-                      // Skip if it's a duplicate "Starting simulator" message
                       return !(trimmed === 'starting simulator...' || trimmed === 'starting simulator')
                     })
                     
-                    // Add each line separately to the terminal output
-                    // Preserve empty lines for proper formatting
                     setTerminalOutput((prev) => [...prev, ...filteredLines])
                   } else if (data.type === 'end') {
-                    // Check if simulator completed successfully (code 0)
                     const success = data.code === 0
                     if (success) {
-                      setHasRunSimulator(true) // Enable Load Automata button
+                      setHasRunSimulator(true)
                       if (onComplete) {
                         onComplete()
                       }
                     } else {
-                      setHasRunSimulator(false) // Don't enable if it failed
+                      setHasRunSimulator(false)
                     }
                     setIsRunning(false)
-                    return // Exit the read loop
+                    return
                   } else if (data.type === 'error') {
                     setTerminalOutput((prev) => [...prev, data.message])
                     setIsRunning(false)
-                    setHasRunSimulator(false) // Don't enable if there was an error
-                    return // Exit the read loop
+                    setHasRunSimulator(false)
+                    return
                   } else if (data.type === 'start') {
-                    // Split start message by newlines and filter empty lines
                     const message = data.message || ''
                     const lines = message.split(/\r?\n/).filter((line:string) => line.trim().length > 0)
-                    // Only add if we have lines and avoid duplicates
                     if (lines.length > 0) {
                       setTerminalOutput((prev) => {
-                        // Check if any of the new lines already exist in the last few lines to avoid duplicates
-                        const lastFewLines = prev.slice(-3) // Check last 3 lines
+                        const lastFewLines = prev.slice(-3)
                         const newLinesToAdd = lines.filter((newLine: string) => {
-                          // Skip if this line already exists in recent output
                           return !lastFewLines.some(existingLine => 
                             existingLine.trim() === newLine.trim() || 
                             (existingLine.includes('Starting simulator') && newLine.includes('Starting simulator'))
@@ -181,7 +168,7 @@ export function useSimulator(onComplete?: () => void) {
         setTerminalOutput((prev) => [...prev, `\n[Error: ${msg}]\n`])
       }
       setIsRunning(false)
-      setHasRunSimulator(false) // Don't enable if there was an error
+      setHasRunSimulator(false)
     }
   }, [onComplete])
 
@@ -191,7 +178,7 @@ export function useSimulator(onComplete?: () => void) {
       abortControllerRef.current = null
     }
     setIsRunning(false)
-    setHasRunSimulator(false) // Reset since we stopped it
+    setHasRunSimulator(false)
   }, [])
 
   const reset = useCallback(() => {
@@ -213,4 +200,3 @@ export function useSimulator(onComplete?: () => void) {
     reset
   }
 }
-

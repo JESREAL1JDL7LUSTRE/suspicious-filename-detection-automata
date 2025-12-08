@@ -1,6 +1,7 @@
 import { useCallback, useState, useMemo } from 'react'
 import { fetchAutomataJson, toReactFlowGraph, type AutomataJson, type Graph } from '../parser/json'
 import { useOutputDir } from './useOutputDir'
+import { API_BASE_URL } from '../config'
 
 export function useGraphLoader() {
   const [graph, setGraph] = useState<Graph>({ nodes: [], edges: [] })
@@ -29,7 +30,25 @@ export function useGraphLoader() {
     try {
       setStatus('Loading...')
       console.log('Loading graph from:', `${outputDir}/${selected}`)
-      const aj: AutomataJson = await fetchAutomataJson(`${outputDir}/${selected}`)
+      
+      // In Electron production, use API endpoint to read files
+      let aj: AutomataJson;
+      
+      if (API_BASE_URL) {
+        // Running in Electron - use backend API to read file
+        console.log('Loading via backend API:', `${API_BASE_URL}/api/graph/${selected}`)
+        const response = await fetch(`${API_BASE_URL}/api/graph/${selected}`)
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+        
+        aj = await response.json()
+      } else {
+        // Development - use Vite's file system access
+        aj = await fetchAutomataJson(`${outputDir}/${selected}`)
+      }
+      
       console.log('Loaded JSON:', aj)
       const gf = toReactFlowGraph(aj)
       console.log('Converted to ReactFlow graph:', gf, 'Nodes:', gf.nodes.length, 'Edges:', gf.edges.length)
@@ -59,4 +78,3 @@ export function useGraphLoader() {
     resetGraph
   }
 }
-

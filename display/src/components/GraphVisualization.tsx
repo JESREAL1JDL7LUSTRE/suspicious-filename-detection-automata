@@ -19,6 +19,7 @@ interface GraphVisualizationProps {
   scanResults?: ScanResult[]
   visitedStates?: VisitedState[]
   isScanMode?: boolean
+  totalFiles?: number
 }
 
 export function GraphVisualization({

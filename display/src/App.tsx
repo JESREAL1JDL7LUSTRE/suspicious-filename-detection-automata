@@ -21,27 +21,40 @@ function App() {
   })
 
   const fileScan = useFileScan((results) => {
-    // Auto-load graph after scan completes
+    // Update status after scan completes
     graphLoader.setStatus(`Scan completed - ${results.length} file(s) processed`)
-    // Always load the automata graph to show scan results
-    // The graph will be colored by scan results automatically
-    setTimeout(() => {
-      graphLoader.loadGraph()
-    }, 500)
   })
   
-  // Auto-load graph when scan starts (if not already loaded)
+  // Handle scan start - load graph first, then scan
   const handleScanStart = useCallback(() => {
     if (selectedFiles.length > 0) {
       setMode('scan')
-      // Load graph first if empty, then start scan
-      if (graphLoader.graph.nodes.length === 0) {
-        graphLoader.loadGraph().then(() => {
+      
+      // CRITICAL: Load graph first to ensure visualization is ready
+      console.log('Loading graph before scan...')
+      graphLoader.setStatus('Loading automata for scan...')
+      
+      // Load the first DFA (dfa_min_0.json) which is the main executable pattern matcher
+      graphLoader.setSelected('dfa_min_0.json')
+      
+      graphLoader.loadGraph()
+        .then(() => {
+          console.log('✓ Graph loaded, starting scan with', selectedFiles.length, 'files')
+          graphLoader.setStatus('Scanning files...')
+          
+          // Small delay to ensure graph is rendered
+          setTimeout(() => {
+            fileScan.scanFiles(selectedFiles)
+          }, 500)
+        })
+        .catch((error) => {
+          console.error('Failed to load graph:', error)
+          graphLoader.setStatus(`Error loading graph: ${error.message}`)
+          
+          // Try to scan anyway (graph might not be critical)
+          console.log('Attempting scan without graph...')
           fileScan.scanFiles(selectedFiles)
         })
-      } else {
-        fileScan.scanFiles(selectedFiles)
-      }
     } else {
       simulator.runSimulator()
       setMode('simulator')
@@ -55,12 +68,12 @@ function App() {
   const handleScan = handleScanStart
 
   const handleReset = useCallback(() => {
-    simulator.reset() // Reset simulator (clears terminal output)
-    fileScan.reset() // Reset scan (clears scan results and terminal)
-    setSelectedFiles([]) // Clear selected files
-    setMode('simulator') // Reset to simulator mode
+    simulator.reset()
+    fileScan.reset()
+    setSelectedFiles([])
+    setMode('simulator')
     graphLoader.setStatus('Ready - Click "Run Simulator" to start')
-    graphLoader.resetGraph() // Reset graph to empty state
+    graphLoader.resetGraph()
   }, [simulator, fileScan, graphLoader])
 
   // Determine which output to show
@@ -129,7 +142,7 @@ function App() {
               </div>
             )}
             
-            {/* File Processing Indicator - shown at bottom during scanning */}
+            {/* File Processing Indicator */}
             {mode === 'scan' && isRunning && (
               <FileProcessingIndicator
                 scanResults={fileScan.scanResults}
